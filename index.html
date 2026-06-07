@@ -1,27 +1,96 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" id="html-root">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="description" content="JS 집중력·기억력 향상훈련 — 치매 예방, 두뇌 건강, 집중력·기억력·독서능력을 키우는 무료 온라인 훈련 프로그램. 시니어 특화 두뇌 훈련.">
-<meta name="keywords" content="두뇌훈련,집중력향상,기억력향상,치매예방,속독,독서능력,시니어두뇌건강,안구운동,무료훈련">
+<meta name="description" content="JS 두뇌훈련 — 집중력·기억력·치매예방 무료 훈련 프로그램. 한국어·日本語·Español 지원. 시니어 특화.">
+<meta name="keywords" content="두뇌훈련,집중력향상,기억력향상,치매예방,속독,독서능력,시니어두뇌건강,안구운동,무료훈련,脳トレ,entrenamiento cerebral">
 <meta name="author" content="조성형">
-<meta property="og:title" content="JS 집중력·기억력 향상훈련 — 두뇌가 젊어지는 30분">
-<meta property="og:description" content="시력강화·집중력·기억력·문장기억·독서능력 5가지 무료 두뇌 훈련. 매일 30분으로 치매를 예방하세요.">
+<meta property="og:title" content="JS 두뇌훈련 — 두뇌가 젊어지는 30분">
+<meta property="og:description" content="시력강화·집중력·기억력·문장기억·독서능력 5가지 무료 두뇌 훈련.">
 <meta property="og:url" content="https://jsmylife153.github.io/">
 <meta property="og:type" content="website">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="JS 두뇌훈련">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="format-detection" content="telephone=no">
-<title>JS 두뇌훈련 — 집중력·기억력·치매예방 무료 훈련 | 시니어 두뇌 건강</title>
+<title>JS 두뇌훈련 — 집중력·기억력·치매예방 무료 훈련</title>
 <link rel="canonical" href="https://jsmylife153.github.io/">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
-<!-- Google AdSense -->
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4764750634550822" crossorigin="anonymous"></script>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDDE_fLiFaXtQobP8g3IIrH2bKIz0eVkRk",
+    authDomain: "js-trainer-b0139.firebaseapp.com",
+    projectId: "js-trainer-b0139",
+    storageBucket: "js-trainer-b0139.firebasestorage.app",
+    messagingSenderId: "800427483325",
+    appId: "1:800427483325:web:5f8c8719ae561d163417d4"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  window._db = db;
+  window._fbReady = true;
+
+  // 게시판 글 로드
+  async function loadPosts() {
+    try {
+      const q = query(collection(db, "board"), orderBy("createdAt", "desc"), limit(20));
+      const snap = await getDocs(q);
+      const list = document.getElementById("post-list");
+      list.innerHTML = "";
+      if (snap.empty) {
+        list.innerHTML = '<div class="no-post" data-i18n="board_empty">첫 번째 글을 남겨보세요!</div>';
+        return;
+      }
+      snap.forEach(doc => {
+        const d = doc.data();
+        const div = document.createElement("div");
+        div.className = "post-item";
+        const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString("ko-KR") : "";
+        div.innerHTML = `
+          <div class="post-header">
+            <span class="post-name">${escHtml(d.name||"익명")}</span>
+            <span class="post-lang-badge">${langBadge(d.lang||"kor")}</span>
+            <span class="post-date">${date}</span>
+          </div>
+          <div class="post-body">${escHtml(d.content)}</div>`;
+        list.appendChild(div);
+      });
+    } catch(e) { console.error("loadPosts error",e); }
+  }
+
+  function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function langBadge(l){ return l==="jpn"?"🇯🇵 日本語":l==="esp"?"🇪🇸 Español":"🇰🇷 한국어"; }
+
+  window._loadPosts = loadPosts;
+
+  window._submitPost = async function(name, content, lang) {
+    if(!name.trim()||!content.trim()) return false;
+    try {
+      await addDoc(collection(db, "board"), {
+        name: name.trim().slice(0,20),
+        content: content.trim().slice(0,500),
+        lang: lang,
+        createdAt: serverTimestamp()
+      });
+      return true;
+    } catch(e){ console.error("submitPost error",e); return false; }
+  };
+
+  document.addEventListener("DOMContentLoaded", () => {
+    loadPosts();
+  });
+</script>
+
 <style>
 :root{
   --green:#2d8c4e;--green-light:#e8f5ec;--green-mid:#4aab6d;--green-dark:#1a5e33;
@@ -33,33 +102,21 @@
   --r:16px;--r-sm:10px;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{
-  scroll-behavior:smooth;
-  -webkit-text-size-adjust:100%;
-  text-size-adjust:100%;
-}
-body{
-  font-family:'Noto Sans KR',sans-serif;
-  background:var(--bg);color:var(--text);
-  line-height:1.7;font-size:16px;
-  -webkit-font-smoothing:antialiased;
-  -moz-osx-font-smoothing:grayscale;
-  overflow-x:hidden;
-  padding-left:env(safe-area-inset-left);
-  padding-right:env(safe-area-inset-right);
-}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;font-size:16px;-webkit-font-smoothing:antialiased;overflow-x:hidden;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
 a{color:inherit;text-decoration:none}
 img{max-width:100%;display:block}
-/* iOS 터치 최적화 */
-a,button{
-  -webkit-tap-highlight-color:transparent;
-  touch-action:manipulation;
-}
-/* iOS 입력창 zoom 방지 */
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 input,select,textarea{font-size:16px!important}
 
+/* ── LANG SWITCHER ── */
+.lang-bar{background:var(--green-dark);padding:8px 5%;display:flex;justify-content:flex-end;align-items:center;gap:8px}
+.lang-btn{background:transparent;border:1.5px solid rgba(255,255,255,.4);color:rgba(255,255,255,.8);padding:4px 14px;border-radius:20px;font-size:.8rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.lang-btn.active{background:#fff;color:var(--green-dark);font-weight:700;border-color:#fff}
+.lang-btn:hover{border-color:#fff;color:#fff}
+
 /* ── HEADER ── */
-header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0 5%;padding-left:max(5%,env(safe-area-inset-left));padding-right:max(5%,env(safe-area-inset-right))}
+header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.96);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0 5%}
 .header-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
 .logo{font-family:'Noto Serif KR',serif;font-weight:900;font-size:1.2rem;color:var(--green-dark);display:flex;align-items:center;gap:8px}
 .logo span{background:var(--green);color:#fff;padding:2px 10px;border-radius:20px;font-size:.9rem}
@@ -79,9 +136,15 @@ nav a:hover{color:var(--green)}
 .hero h1 em{font-style:normal;color:#ffe082}
 .hero p{font-size:clamp(1rem,2.5vw,1.2rem);opacity:.92;margin-bottom:36px;max-width:560px;margin-left:auto;margin-right:auto}
 .hero-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
-.btn-hero-main{-webkit-appearance:none;background:#fff;color:var(--green-dark);padding:15px 36px;border-radius:50px;font-weight:900;font-size:1.1rem;box-shadow:0 4px 24px rgba(0,0,0,.2);transition:all .25s;display:inline-flex;align-items:center;gap:8px}
-.btn-hero-main:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,0,0,.25)}
-.btn-hero-sub{background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.5);padding:13px 28px;border-radius:50px;font-weight:600;font-size:1rem;transition:all .25s}
+
+/* 언어별 훈련 시작 버튼 그룹 */
+.lang-start-group{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}
+.btn-lang-start{-webkit-appearance:none;padding:14px 28px;border-radius:50px;font-weight:900;font-size:1rem;display:inline-flex;align-items:center;gap:8px;transition:all .25s;border:none;cursor:pointer;font-family:inherit}
+.btn-lang-start.kor{background:#fff;color:var(--green-dark);box-shadow:0 4px 24px rgba(0,0,0,.2)}
+.btn-lang-start.jpn{background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.6)}
+.btn-lang-start.esp{background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.6)}
+.btn-lang-start:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,0,0,.25)}
+.btn-hero-sub{background:rgba(255,255,255,.15);color:#fff;border:2px solid rgba(255,255,255,.5);padding:13px 28px;border-radius:50px;font-weight:600;font-size:1rem;transition:all .25s;display:inline-block}
 .btn-hero-sub:hover{background:rgba(255,255,255,.25)}
 .hero-tags{margin-top:40px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .hero-tags span{background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);padding:4px 14px;border-radius:16px;font-size:.8rem}
@@ -112,9 +175,21 @@ nav a:hover{color:var(--green)}
 .train-card p{font-size:.85rem;color:var(--text-mid);line-height:1.6}
 .train-badge{display:inline-block;margin-top:12px;background:var(--green);color:#fff;font-size:.75rem;padding:3px 12px;border-radius:12px}
 
-/* ── AD AREA ── */
-.ad-area{background:#f5f5f5;border:1px dashed #ccc;border-radius:var(--r-sm);padding:24px;text-align:center;color:#aaa;font-size:.85rem;margin:32px 0}
-.ad-label{font-size:.7rem;color:#bbb;margin-bottom:4px}
+
+
+/* ── LANGUAGE SECTION ── */
+.lang-section{padding:72px 5%;background:linear-gradient(135deg,#f0f9f4,#e8f5ec)}
+.lang-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:28px;max-width:1000px;margin:0 auto}
+.lang-card{background:#fff;border-radius:var(--r);box-shadow:var(--shadow);overflow:hidden;transition:all .28s;border:1px solid var(--border);text-align:center;padding:40px 28px}
+.lang-card:hover{transform:translateY(-6px);box-shadow:var(--shadow-lg)}
+.lang-flag{font-size:3rem;margin-bottom:16px}
+.lang-card h3{font-family:'Noto Serif KR',serif;font-size:1.3rem;font-weight:900;color:var(--text);margin-bottom:8px}
+.lang-card p{font-size:.9rem;color:var(--text-soft);line-height:1.7;margin-bottom:24px}
+.btn-lang{display:inline-block;background:var(--green);color:#fff;padding:12px 32px;border-radius:50px;font-weight:700;font-size:.95rem;transition:all .2s;box-shadow:0 2px 12px rgba(45,140,78,.3)}
+.btn-lang:hover{background:var(--green-dark);transform:translateY(-2px)}
+.lang-status-badge{display:inline-block;font-size:.75rem;padding:3px 12px;border-radius:12px;margin-bottom:16px;font-weight:600}
+.status-live{background:#e8f5ec;color:var(--green)}
+.status-soon{background:#fff8e6;color:#b8860b}
 
 /* ── BLOG ── */
 .blog-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:28px}
@@ -125,14 +200,14 @@ nav a:hover{color:var(--green)}
 .blog-tag{font-size:.72rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
 .blog-body h3{font-family:'Noto Serif KR',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:10px;line-height:1.4}
 .blog-body p{font-size:.85rem;color:var(--text-soft);line-height:1.7;margin-bottom:14px}
-.blog-read{font-size:.82rem;color:var(--green);font-weight:700;display:inline-flex;align-items:center;gap:4px}
+.blog-read{font-size:.82rem;color:var(--green);font-weight:700;display:inline-flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:0;font-family:inherit}
 .blog-read::after{content:'→';transition:transform .2s}
 .blog-card:hover .blog-read::after{transform:translateX(4px)}
 .blog-meta{display:flex;gap:12px;margin-top:10px;padding-top:12px;border-top:1px solid var(--border)}
 .blog-meta span{font-size:.75rem;color:var(--text-soft)}
 
 /* ── ARTICLE MODAL ── */
-.article-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:40px 20px;padding-bottom:max(40px,env(safe-area-inset-bottom))}
+.article-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:40px 20px}
 .article-overlay.open{display:flex;justify-content:center;align-items:flex-start}
 .article-box{background:#fff;border-radius:var(--r);max-width:720px;width:100%;padding:40px;position:relative;margin:auto}
 .article-close{position:absolute;top:16px;right:16px;width:36px;height:36px;background:var(--border);border:none;border-radius:50%;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid)}
@@ -146,8 +221,8 @@ nav a:hover{color:var(--green)}
 .article-source{font-size:.75rem;color:#aaa;margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
 
 /* ── HOW TO ── */
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;position:relative}
-.step-card{background:#fff;border-radius:var(--r);padding:28px 22px;text-align:center;border:1.5px solid var(--border);position:relative}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
+.step-card{background:#fff;border-radius:var(--r);padding:28px 22px;text-align:center;border:1.5px solid var(--border)}
 .step-num{width:44px;height:44px;background:var(--green);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:1.2rem;margin:0 auto 16px;font-family:'Noto Serif KR',serif}
 .step-card h3{font-weight:700;font-size:1rem;margin-bottom:8px;color:var(--text)}
 .step-card p{font-size:.85rem;color:var(--text-soft);line-height:1.6}
@@ -172,6 +247,34 @@ nav a:hover{color:var(--green)}
 .faq-a{font-size:.88rem;color:var(--text-mid);line-height:1.75;padding:0 22px;max-height:0;overflow:hidden;transition:all .3s ease}
 .faq-item.open .faq-a{padding:0 22px 18px;max-height:300px}
 
+/* ── BOARD ── */
+.board-section{padding:72px 5%;background:#fff}
+.board-wrap{max-width:800px;margin:0 auto}
+.board-form{background:var(--green-light);border-radius:var(--r);padding:28px;margin-bottom:32px;border:1.5px solid #c8e6d0}
+.board-form-title{font-family:'Noto Serif KR',serif;font-size:1.1rem;font-weight:700;color:var(--green-dark);margin-bottom:16px}
+.board-row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.board-input{flex:1;min-width:120px;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:.9rem;background:#fff;transition:border .2s}
+.board-input:focus{outline:none;border-color:var(--green)}
+.board-textarea{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:.9rem;background:#fff;resize:vertical;min-height:100px;transition:border .2s;margin-bottom:12px}
+.board-textarea:focus{outline:none;border-color:var(--green)}
+.board-lang-select{padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:.9rem;background:#fff;cursor:pointer}
+.btn-submit{background:var(--green);color:#fff;padding:11px 28px;border-radius:50px;font-weight:700;font-size:.95rem;border:none;cursor:pointer;transition:all .2s;font-family:inherit}
+.btn-submit:hover{background:var(--green-dark);transform:translateY(-1px)}
+.btn-submit:disabled{background:#aaa;cursor:not-allowed;transform:none}
+.board-msg{font-size:.85rem;margin-top:8px;min-height:20px}
+.board-msg.ok{color:var(--green)}
+.board-msg.err{color:#c0392b}
+
+.post-list-title{font-family:'Noto Serif KR',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.post-item{background:var(--bg);border:1px solid var(--border);border-radius:var(--r-sm);padding:18px 20px;margin-bottom:12px;transition:box-shadow .2s}
+.post-item:hover{box-shadow:var(--shadow)}
+.post-header{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.post-name{font-weight:700;font-size:.9rem;color:var(--text)}
+.post-lang-badge{font-size:.72rem;background:var(--green-light);color:var(--green);padding:2px 8px;border-radius:10px;font-weight:600}
+.post-date{font-size:.75rem;color:var(--text-soft);margin-left:auto}
+.post-body{font-size:.88rem;color:var(--text-mid);line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.no-post{text-align:center;color:var(--text-soft);padding:32px;font-size:.9rem}
+
 /* ── CTA BANNER ── */
 .cta-banner{background:linear-gradient(135deg,var(--green-dark),var(--green));padding:64px 5%;text-align:center;color:#fff}
 .cta-banner h2{font-family:'Noto Serif KR',serif;font-size:clamp(1.6rem,3.5vw,2.2rem);font-weight:900;margin-bottom:16px}
@@ -180,7 +283,7 @@ nav a:hover{color:var(--green)}
 .btn-cta:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(0,0,0,.25)}
 
 /* ── FOOTER ── */
-footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 28px;padding-bottom:max(28px,env(safe-area-inset-bottom))}
+footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 28px}
 .footer-inner{max-width:1100px;margin:0 auto}
 .footer-top{display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px;margin-bottom:36px;padding-bottom:36px;border-bottom:1px solid rgba(255,255,255,.15)}
 .footer-brand .logo-text{font-family:'Noto Serif KR',serif;font-size:1.2rem;font-weight:900;color:#fff;margin-bottom:12px}
@@ -200,11 +303,14 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
   .footer-top{grid-template-columns:1fr}
   .footer-bottom{flex-direction:column;text-align:center}
   .article-box{padding:24px}
+  .board-row{flex-direction:column}
 }
 @media(max-width:480px){
   .hero{padding:60px 4% 70px}
   .hero-btns{flex-direction:column;align-items:center}
-  .btn-hero-main,.btn-hero-sub{width:100%;max-width:300px;justify-content:center}
+  .lang-start-group{flex-direction:column;align-items:center}
+  .btn-lang-start{width:100%;max-width:300px;justify-content:center}
+  .btn-hero-sub{width:100%;max-width:300px;text-align:center}
   .stats-inner{grid-template-columns:repeat(2,1fr)}
 }
 
@@ -217,15 +323,23 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 </head>
 <body>
 
+<!-- 언어 선택 바 -->
+<div class="lang-bar">
+  <button class="lang-btn active" onclick="setLang('kor')" id="btn-kor">🇰🇷 한국어</button>
+  <button class="lang-btn" onclick="setLang('jpn')" id="btn-jpn">🇯🇵 日本語</button>
+  <button class="lang-btn" onclick="setLang('esp')" id="btn-esp">🇪🇸 Español</button>
+</div>
+
 <!-- HEADER -->
 <header>
   <div class="header-inner">
-    <div class="logo">🧠 <span>JS</span> 두뇌훈련</div>
+    <div class="logo">🧠 <span>JS</span> <span data-i18n="site_name">두뇌훈련</span></div>
     <nav>
-      <a href="#training">훈련 소개</a>
-      <a href="#blog">두뇌 건강 정보</a>
-      <a href="#faq">자주 묻는 질문</a>
-      <a href="/kor/app.html" class="btn-start">▶ 훈련 시작</a>
+      <a href="#training" data-i18n="nav_training">훈련 소개</a>
+      <a href="#languages" data-i18n="nav_lang">언어 선택</a>
+      <a href="#blog" data-i18n="nav_blog">두뇌 건강 정보</a>
+      <a href="#board" data-i18n="nav_board">게시판</a>
+      <a href="/kor/app.html" class="btn-start" data-i18n="nav_start">▶ 훈련 시작</a>
     </nav>
   </div>
 </header>
@@ -233,13 +347,15 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 <!-- HERO -->
 <section class="hero">
   <div class="hero-inner">
-    <div class="hero-badge">✅ 완전 무료 · 앱 설치 불필요 · 시니어 특화</div>
-    <h1>두뇌가 젊어지는 <em>30분</em>,<br>매일 꾸준히</h1>
-    <p>시력강화·집중력·기억력·문장기억·독서능력<br>5가지 과학적 두뇌 훈련으로 치매를 예방하세요</p>
-    <div class="hero-btns">
-      <a href="/kor/app.html" class="btn-hero-main">▶ 지금 바로 훈련 시작</a>
-      <a href="#training" class="btn-hero-sub">훈련 소개 보기</a>
+    <div class="hero-badge" data-i18n="hero_badge">✅ 완전 무료 · 앱 설치 불필요 · 시니어 특화</div>
+    <h1 data-i18n="hero_h1">두뇌가 젊어지는 <em>30분</em>,<br>매일 꾸준히</h1>
+    <p data-i18n="hero_p">시력강화·집중력·기억력·문장기억·독서능력<br>5가지 과학적 두뇌 훈련으로 치매를 예방하세요</p>
+    <div class="lang-start-group">
+      <button class="btn-lang-start kor" onclick="location.href='/kor/app.html'">🇰🇷 한국어 훈련 시작</button>
+      <button class="btn-lang-start jpn" onclick="location.href='/jpn/app_jpn.html'">🇯🇵 日本語 トレーニング</button>
+      <button class="btn-lang-start esp" onclick="location.href='/esp/app_esp.html'">🇪🇸 Entrenar en Español</button>
     </div>
+    <a href="#training" class="btn-hero-sub" data-i18n="hero_sub">훈련 소개 보기</a>
     <div class="hero-tags">
       <span>🧠 치매 예방</span>
       <span>📚 속독 훈련</span>
@@ -254,80 +370,102 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 <div class="stats">
   <div class="stats-inner">
     <div class="stat-item fade-up">
-      <div><span class="stat-num">2</span><span class="stat-unit">주</span></div>
-      <div class="stat-label">꾸준히 훈련하면<br>집중력 변화 체감</div>
+      <div><span class="stat-num">2</span><span class="stat-unit" data-i18n="stat1_unit">주</span></div>
+      <div class="stat-label" data-i18n="stat1_label">꾸준히 훈련하면<br>집중력 변화 체감</div>
     </div>
     <div class="stat-item fade-up">
-      <div><span class="stat-num">30</span><span class="stat-unit">분</span></div>
-      <div class="stat-label">하루 권장 훈련 시간<br>부담 없이 시작</div>
+      <div><span class="stat-num">30</span><span class="stat-unit" data-i18n="stat2_unit">분</span></div>
+      <div class="stat-label" data-i18n="stat2_label">하루 권장 훈련 시간<br>부담 없이 시작</div>
     </div>
     <div class="stat-item fade-up">
-      <div><span class="stat-num">5</span><span class="stat-unit">가지</span></div>
-      <div class="stat-label">두뇌 훈련 모드<br>한 번에 해결</div>
+      <div><span class="stat-num">5</span><span class="stat-unit" data-i18n="stat3_unit">가지</span></div>
+      <div class="stat-label" data-i18n="stat3_label">두뇌 훈련 모드<br>한 번에 해결</div>
     </div>
     <div class="stat-item fade-up">
-      <div><span class="stat-num">100</span><span class="stat-unit">%</span></div>
-      <div class="stat-label">완전 무료<br>앱 설치 불필요</div>
+      <div><span class="stat-num">3</span><span class="stat-unit" data-i18n="stat4_unit">개</span></div>
+      <div class="stat-label" data-i18n="stat4_label">지원 언어<br>한국어·日本語·Español</div>
     </div>
   </div>
 </div>
 
-<!-- AD AREA 1 -->
-<div style="max-width:1100px;margin:0 auto;padding:0 5%">
-  <div class="ad-area" style="background:transparent;border:none;padding:8px 0;">
-    <div class="ad-label">광고</div>
-    <ins class="adsbygoogle"
-     style="display:block;width:100%;min-height:90px"
-     data-ad-client="ca-pub-4764750634550822"
-     data-ad-slot="auto"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-  </div>
-</div>
+
 
 <!-- TRAINING -->
 <section class="section section-alt" id="training">
   <div class="inner">
     <div class="section-title">
-      <div class="label">5가지 두뇌 훈련</div>
-      <h2>과학적으로 설계된<br>두뇌 강화 프로그램</h2>
-      <p>각 훈련은 뇌의 서로 다른 영역을 자극하여 종합적인 인지 기능 향상을 돕습니다</p>
+      <div class="label" data-i18n="train_label">5가지 두뇌 훈련</div>
+      <h2 data-i18n="train_h2">과학적으로 설계된<br>두뇌 강화 프로그램</h2>
+      <p data-i18n="train_p">각 훈련은 뇌의 서로 다른 영역을 자극하여 종합적인 인지 기능 향상을 돕습니다</p>
     </div>
     <div class="train-grid">
       <div class="train-card fade-up">
         <div class="train-icon">👁️</div>
-        <h3>시력강화 훈련</h3>
-        <p>격자 위를 이동하는 도형을 눈으로 추적하며 안구 근육을 단련하고 시야를 확장합니다</p>
-        <span class="train-badge">준비 운동</span>
+        <h3 data-i18n="t1_title">시력강화 훈련</h3>
+        <p data-i18n="t1_desc">격자 위를 이동하는 도형을 눈으로 추적하며 안구 근육을 단련하고 시야를 확장합니다</p>
+        <span class="train-badge" data-i18n="t1_badge">준비 운동</span>
       </div>
       <div class="train-card fade-up">
         <div class="train-icon">🎯</div>
-        <h3>집중력 훈련</h3>
-        <p>순식간에 나타났다 사라지는 낱말을 포착하는 훈련으로 순간 인식력과 주의력을 키웁니다</p>
-        <span class="train-badge">핵심 훈련</span>
+        <h3 data-i18n="t2_title">집중력 훈련</h3>
+        <p data-i18n="t2_desc">순식간에 나타났다 사라지는 낱말을 포착하는 훈련으로 순간 인식력과 주의력을 키웁니다</p>
+        <span class="train-badge" data-i18n="t2_badge">핵심 훈련</span>
       </div>
       <div class="train-card fade-up">
         <div class="train-icon">🧠</div>
-        <h3>기억력 훈련</h3>
-        <p>여러 위치에 등장하는 낱말을 기억하는 훈련으로 단기 기억력과 작업 기억을 강화합니다</p>
-        <span class="train-badge">핵심 훈련</span>
+        <h3 data-i18n="t3_title">기억력 훈련</h3>
+        <p data-i18n="t3_desc">여러 위치에 등장하는 낱말을 기억하는 훈련으로 단기 기억력과 작업 기억을 강화합니다</p>
+        <span class="train-badge" data-i18n="t3_badge">핵심 훈련</span>
       </div>
       <div class="train-card fade-up">
         <div class="train-icon">📝</div>
-        <h3>문장기억 훈련</h3>
-        <p>여러 문장 속 낱말의 위치를 기억하는 훈련으로 독해력과 문맥 파악 능력을 향상시킵니다</p>
-        <span class="train-badge">심화 훈련</span>
+        <h3 data-i18n="t4_title">문장기억 훈련</h3>
+        <p data-i18n="t4_desc">여러 문장 속 낱말의 위치를 기억하는 훈련으로 독해력과 문맥 파악 능력을 향상시킵니다</p>
+        <span class="train-badge" data-i18n="t4_badge">심화 훈련</span>
       </div>
       <div class="train-card fade-up">
         <div class="train-icon">📖</div>
-        <h3>독서능력 향상</h3>
-        <p>장문을 읽고 퀴즈로 이해도를 확인하는 훈련으로 독서 속도와 이해력을 함께 높입니다</p>
-        <span class="train-badge">독해 훈련</span>
+        <h3 data-i18n="t5_title">독서능력 향상</h3>
+        <p data-i18n="t5_desc">장문을 읽고 퀴즈로 이해도를 확인하는 훈련으로 독서 속도와 이해력을 함께 높입니다</p>
+        <span class="train-badge" data-i18n="t5_badge">독해 훈련</span>
       </div>
     </div>
     <div style="text-align:center;margin-top:40px">
-      <a href="/kor/app.html" class="btn-hero-main" style="display:inline-flex;background:var(--green);color:#fff;padding:14px 36px;border-radius:50px;font-weight:900;font-size:1rem;gap:8px;box-shadow:0 4px 20px rgba(45,140,78,.3);transition:all .25s">▶ 5가지 훈련 지금 시작하기</a>
+      <a href="/kor/app.html" class="btn-lang-start kor" style="display:inline-flex" data-i18n="train_cta">▶ 5가지 훈련 지금 시작하기</a>
+    </div>
+  </div>
+</section>
+
+<!-- LANGUAGE SELECTION -->
+<section class="lang-section" id="languages">
+  <div class="inner">
+    <div class="section-title">
+      <div class="label" data-i18n="lang_label">MULTILINGUAL</div>
+      <h2 data-i18n="lang_h2">원하는 언어로<br>두뇌 훈련을 시작하세요</h2>
+      <p data-i18n="lang_p">한국어, 일본어, 스페인어로 동일한 두뇌 훈련을 제공합니다</p>
+    </div>
+    <div class="lang-cards">
+      <div class="lang-card fade-up">
+        <div class="lang-flag">🇰🇷</div>
+        <span class="lang-status-badge status-live">● 서비스 중</span>
+        <h3>한국어</h3>
+        <p>시력강화·집중력·기억력·문장기억·독서능력<br>5가지 두뇌 훈련 (한국어판)</p>
+        <a href="/kor/app.html" class="btn-lang">한국어로 시작 →</a>
+      </div>
+      <div class="lang-card fade-up">
+        <div class="lang-flag">🇯🇵</div>
+        <span class="lang-status-badge status-live">● サービス中</span>
+        <h3>日本語</h3>
+        <p>視力強化・集中力・記憶力・文章記憶・読書能力<br>5種類の脳トレ (日本語版)</p>
+        <a href="/jpn/app_jpn.html" class="btn-lang">日本語で始める →</a>
+      </div>
+      <div class="lang-card fade-up">
+        <div class="lang-flag">🇪🇸</div>
+        <span class="lang-status-badge status-live">● En servicio</span>
+        <h3>Español</h3>
+        <p>Visión·Concentración·Memoria·Frases·Lectura<br>5 entrenamientos cerebrales (versión español)</p>
+        <a href="/esp/app_esp.html" class="btn-lang">Comenzar en Español →</a>
+      </div>
     </div>
   </div>
 </section>
@@ -336,41 +474,22 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 <section class="section" id="blog">
   <div class="inner">
     <div class="section-title">
-      <div class="label">두뇌 건강 정보</div>
-      <h2>시니어 두뇌 건강<br>꼭 알아야 할 정보</h2>
-      <p>치매 예방부터 기억력 향상까지, 전문가가 검증한 두뇌 건강 정보를 제공합니다</p>
-    </div>
-
-    <!-- AD AREA 2 -->
-    <div class="ad-area" style="background:transparent;border:none;padding:8px 0;">
-      <div class="ad-label">광고</div>
-      <ins class="adsbygoogle"
-     style="display:block;width:100%;min-height:90px"
-     data-ad-client="ca-pub-4764750634550822"
-     data-ad-slot="auto"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+      <div class="label" data-i18n="blog_label">두뇌 건강 정보</div>
+      <h2 data-i18n="blog_h2">시니어 두뇌 건강<br>꼭 알아야 할 정보</h2>
+      <p data-i18n="blog_p">치매 예방부터 기억력 향상까지, 전문가가 검증한 두뇌 건강 정보를 제공합니다</p>
     </div>
 
     <div class="blog-grid">
-
-      <!-- 아티클 1 -->
       <div class="blog-card fade-up">
         <div class="blog-thumb" style="background:linear-gradient(135deg,#e8f5ec,#c8e6d0)">🧠</div>
         <div class="blog-body">
           <div class="blog-tag">치매 예방</div>
           <h3>치매 예방을 위한 두뇌 훈련 7가지</h3>
-          <p>65세 이상 노인 10명 중 1명이 치매를 앓고 있습니다. 하지만 꾸준한 두뇌 훈련으로 치매 발생 위험을 최대 35% 낮출 수 있다는 연구 결과가 있습니다...</p>
+          <p>65세 이상 노인 10명 중 1명이 치매를 앓고 있습니다. 꾸준한 두뇌 훈련으로 치매 발생 위험을 최대 35% 낮출 수 있다는 연구 결과가 있습니다...</p>
           <button class="blog-read" onclick="openArticle('a1')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 두뇌 건강</span>
-            <span>⏱ 4분 읽기</span>
-          </div>
+          <div class="blog-meta"><span>📅 두뇌 건강</span><span>⏱ 4분 읽기</span></div>
         </div>
       </div>
-
-      <!-- 아티클 2 -->
       <div class="blog-card fade-up">
         <div class="blog-thumb" style="background:linear-gradient(135deg,#fff8e6,#ffe0a0)">👴</div>
         <div class="blog-body">
@@ -378,147 +497,50 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
           <h3>60대 이후 기억력 저하, 원인과 해결책</h3>
           <p>나이가 들면 왜 기억력이 떨어질까요? 뇌세포 감소, 신경전달물질 변화, 혈류 감소 등 다양한 원인이 있습니다. 하지만 뇌는 훈련으로 변화할 수 있습니다...</p>
           <button class="blog-read" onclick="openArticle('a2')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 기억력</span>
-            <span>⏱ 5분 읽기</span>
-          </div>
+          <div class="blog-meta"><span>📅 기억력</span><span>⏱ 5분 읽기</span></div>
         </div>
       </div>
-
-      <!-- 아티클 3 -->
       <div class="blog-card fade-up">
         <div class="blog-thumb" style="background:linear-gradient(135deg,#e8f0ff,#c0d4ff)">📚</div>
         <div class="blog-body">
           <div class="blog-tag">속독 원리</div>
           <h3>속독의 원리 — 눈이 아닌 뇌로 읽는 법</h3>
-          <p>일반인의 독서 속도는 분당 200~300자 수준입니다. 속독 훈련을 통해 분당 600자 이상 읽으면서도 이해도를 높이는 방법이 있습니다. 비결은 '안구 운동'에 있습니다...</p>
+          <p>일반인의 독서 속도는 분당 200~300자 수준입니다. 속독 훈련을 통해 분당 600자 이상 읽으면서도 이해도를 높이는 방법이 있습니다...</p>
           <button class="blog-read" onclick="openArticle('a3')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 독서 능력</span>
-            <span>⏱ 4분 읽기</span>
-          </div>
+          <div class="blog-meta"><span>📅 독서 능력</span><span>⏱ 4분 읽기</span></div>
         </div>
       </div>
-
-      <!-- 아티클 4 -->
       <div class="blog-card fade-up">
         <div class="blog-thumb" style="background:linear-gradient(135deg,#fce8f0,#f5b8d0)">⚡</div>
         <div class="blog-body">
           <div class="blog-tag">집중력</div>
           <h3>집중력이 3배 좋아지는 생활 습관 5가지</h3>
-          <p>집중력은 타고나는 것이 아닙니다. 올바른 생활 습관과 꾸준한 훈련으로 누구나 집중력을 향상시킬 수 있습니다. 하버드 의대 연구팀이 밝힌 집중력 향상 5가지 습관...</p>
+          <p>집중력은 타고나는 것이 아닙니다. 올바른 생활 습관과 꾸준한 훈련으로 누구나 집중력을 향상시킬 수 있습니다. 하버드 의대 연구팀이 밝힌 습관...</p>
           <button class="blog-read" onclick="openArticle('a4')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 집중력</span>
-            <span>⏱ 4분 읽기</span>
-          </div>
+          <div class="blog-meta"><span>📅 집중력</span><span>⏱ 4분 읽기</span></div>
         </div>
       </div>
-
-      <!-- 아티클 5 -->
       <div class="blog-card fade-up">
         <div class="blog-thumb" style="background:linear-gradient(135deg,#e8faf0,#a8e6c8)">🌅</div>
         <div class="blog-body">
           <div class="blog-tag">시니어 건강</div>
           <h3>시니어를 위한 하루 30분 두뇌 운동법</h3>
-          <p>운동이 몸을 건강하게 하듯, 두뇌도 꾸준한 운동이 필요합니다. 하루 30분만 투자하면 기억력, 집중력, 인지 기능이 크게 향상됩니다. 시니어를 위한 맞춤 두뇌 운동법...</p>
+          <p>운동이 몸을 건강하게 하듯, 두뇌도 꾸준한 운동이 필요합니다. 하루 30분만 투자하면 기억력, 집중력, 인지 기능이 크게 향상됩니다...</p>
           <button class="blog-read" onclick="openArticle('a5')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 시니어 건강</span>
-            <span>⏱ 5분 읽기</span>
-          </div>
+          <div class="blog-meta"><span>📅 시니어 건강</span><span>⏱ 5분 읽기</span></div>
         </div>
       </div>
-
-      <!-- 아티클 6 -->
       <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#f8f0ff,#d4b8f0)">✝️</div>
+        <div class="blog-thumb" style="background:linear-gradient(135deg,#f0e8ff,#d4b8f5)">✝️</div>
         <div class="blog-body">
           <div class="blog-tag">성경과 두뇌</div>
           <h3>성경 암송이 뇌 건강에 미치는 놀라운 영향</h3>
-          <p>성경을 암송하는 행위는 단순한 신앙 활동을 넘어 뇌 건강에도 탁월한 효과가 있습니다. 규칙적인 성경 암송이 해마의 크기를 유지하고 인지 기능 저하를 늦춘다는 연구 결과...</p>
+          <p>성경을 암송하는 행위는 단순한 신앙 활동을 넘어 뇌 건강에도 탁월한 효과가 있습니다. 신경과학 연구들은 규칙적인 암송이 해마 기능을 강화한다고 밝힙니다...</p>
           <button class="blog-read" onclick="openArticle('a6')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 뇌 건강</span>
-            <span>⏱ 4분 읽기</span>
-          </div>
+          <div class="blog-meta"><span>📅 성경·두뇌</span><span>⏱ 4분 읽기</span></div>
         </div>
       </div>
-
-      <!-- 아티클 7 -->
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#e8f8ff,#b0e0ff)">👀</div>
-        <div class="blog-body">
-          <div class="blog-tag">안구 운동</div>
-          <h3>독서 능력 향상을 위한 안구 운동법</h3>
-          <p>독서 속도의 핵심은 안구 운동에 있습니다. 우리 눈은 글을 읽을 때 초당 3~4회의 '도약 운동(Saccade)'을 합니다. 이 운동을 훈련하면 독서 속도가 2배 빨라집니다...</p>
-          <button class="blog-read" onclick="openArticle('a7')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 독서 능력</span>
-            <span>⏱ 4분 읽기</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 아티클 8 -->
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#fff5e8,#ffd0a0)">💡</div>
-        <div class="blog-body">
-          <div class="blog-tag">뇌 가소성</div>
-          <h3>나이 들어도 기억력 회복이 가능한 이유</h3>
-          <p>'뇌 가소성(Brain Plasticity)'이란 뇌가 새로운 신경 연결을 만들어내는 능력입니다. 최신 신경과학 연구에 따르면 70대에도 새로운 뇌세포가 생성됩니다...</p>
-          <button class="blog-read" onclick="openArticle('a8')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 뇌 과학</span>
-            <span>⏱ 5분 읽기</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 아티클 9 -->
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#ffe8e8,#ffb0b0)">📱</div>
-        <div class="blog-body">
-          <div class="blog-tag">디지털 건강</div>
-          <h3>스마트폰이 집중력을 파괴하는 이유</h3>
-          <p>하루 평균 스마트폰 사용 시간이 4시간을 넘어섰습니다. 스마트폰의 알림, 소셜미디어 스크롤이 뇌의 '도파민 회로'를 교란하여 집중력을 심각하게 저하시킵니다...</p>
-          <button class="blog-read" onclick="openArticle('a9')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 집중력</span>
-            <span>⏱ 4분 읽기</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 아티클 10 -->
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#e8f5ec,#b0dcc0)">🔤</div>
-        <div class="blog-body">
-          <div class="blog-tag">낱말 훈련</div>
-          <h3>하루 10분 낱말 훈련의 놀라운 두뇌 효과</h3>
-          <p>낱말 훈련은 단순해 보이지만 뇌의 여러 영역을 동시에 활성화합니다. 시각 피질, 언어 중추, 기억 회로가 함께 작동하며 두뇌 전체를 깨웁니다...</p>
-          <button class="blog-read" onclick="openArticle('a10')">자세히 읽기</button>
-          <div class="blog-meta">
-            <span>📅 두뇌 훈련</span>
-            <span>⏱ 3분 읽기</span>
-          </div>
-        </div>
-      </div>
-
-    </div><!-- /blog-grid -->
-
-    <!-- AD AREA 3 -->
-    <div class="ad-area" style="background:transparent;border:none;padding:8px 0;">
-      <div class="ad-label">광고</div>
-      <ins class="adsbygoogle"
-     style="display:block;width:100%;min-height:90px"
-     data-ad-client="ca-pub-4764750634550822"
-     data-ad-slot="auto"
-     data-ad-format="auto"
-     data-full-width-responsive="true"></ins>
-<script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
     </div>
-
   </div>
 </section>
 
@@ -526,124 +548,114 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 <section class="section section-alt" id="howto">
   <div class="inner">
     <div class="section-title">
-      <div class="label">사용 방법</div>
-      <h2>3단계로 시작하는<br>두뇌 훈련</h2>
+      <div class="label" data-i18n="howto_label">사용 방법</div>
+      <h2 data-i18n="howto_h2">3단계로 시작하는<br>두뇌 훈련</h2>
     </div>
     <div class="steps">
       <div class="step-card fade-up">
         <div class="step-num">1</div>
-        <h3>사이트 접속</h3>
-        <p>앱 설치 없이 인터넷 브라우저로 바로 접속합니다. 홈 화면에 추가하면 앱처럼 사용 가능합니다.</p>
+        <h3 data-i18n="step1_title">언어 선택</h3>
+        <p data-i18n="step1_desc">한국어, 일본어, 스페인어 중 원하는 언어를 선택하세요. 각 언어로 동일한 두뇌 훈련을 받을 수 있습니다.</p>
       </div>
       <div class="step-card fade-up">
         <div class="step-num">2</div>
-        <h3>훈련 선택</h3>
-        <p>5가지 훈련 중 원하는 것을 선택합니다. 처음엔 시력강화 훈련부터 시작하는 것을 권장합니다.</p>
+        <h3 data-i18n="step2_title">수준 설정</h3>
+        <p data-i18n="step2_desc">처음이라면 '하' 수준부터 시작하세요. 80점 이상이면 다음 수준으로 자동 추천됩니다.</p>
       </div>
       <div class="step-card fade-up">
         <div class="step-num">3</div>
-        <h3>매일 30분</h3>
-        <p>하루 30분, 2주 이상 꾸준히 훈련합니다. 훈련 후 점수를 기록하여 향상도를 확인하세요.</p>
+        <h3 data-i18n="step3_title">매일 30분</h3>
+        <p data-i18n="step3_desc">5가지 훈련을 순서대로 진행하세요. 2주만 꾸준히 하면 집중력과 기억력의 변화를 느끼실 수 있습니다.</p>
       </div>
       <div class="step-card fade-up">
         <div class="step-num">4</div>
-        <h3>효과 확인</h3>
-        <p>전체 랭킹과 나의 점수를 확인하며 동기를 유지합니다. 꾸준함이 최고의 두뇌 훈련입니다.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- REVIEWS -->
-<section class="section" id="reviews">
-  <div class="inner">
-    <div class="section-title">
-      <div class="label">사용 후기</div>
-      <h2>실제 훈련자들의<br>생생한 후기</h2>
-    </div>
-    <div class="review-grid">
-      <div class="review-card fade-up">
-        <div class="review-stars">★★★★★</div>
-        <p>매일 30분씩 3주 훈련했더니 책 읽는 속도가 눈에 띄게 빨라졌습니다. 예전엔 한 페이지 읽는 데 5분 걸렸는데 이제 2분이면 충분해요. 정말 놀랍습니다.</p>
-        <div class="review-author">
-          <div class="review-avatar">👩</div>
-          <div class="review-info">
-            <strong>박○○님</strong>
-            <span>67세 · 서울 거주</span>
-          </div>
-        </div>
-      </div>
-      <div class="review-card fade-up">
-        <div class="review-stars">★★★★★</div>
-        <p>집중력 훈련을 꾸준히 하고 나서 업무 중 실수가 줄었습니다. 회의할 때 메모 없이도 내용을 기억할 수 있게 됐어요. 무료라서 더욱 감사합니다.</p>
-        <div class="review-author">
-          <div class="review-avatar">👨</div>
-          <div class="review-info">
-            <strong>김○○님</strong>
-            <span>58세 · 직장인</span>
-          </div>
-        </div>
-      </div>
-      <div class="review-card fade-up">
-        <div class="review-stars">★★★★★</div>
-        <p>성경 암송할 때 문장기억 훈련이 정말 도움돼요. 전에는 구절을 외우는 데 한 시간 걸렸는데 이제 30분이면 됩니다. 두뇌 훈련과 신앙이 함께 성장하는 느낌이에요.</p>
-        <div class="review-author">
-          <div class="review-avatar">👩</div>
-          <div class="review-info">
-            <strong>이○○님</strong>
-            <span>71세 · 은퇴자</span>
-          </div>
-        </div>
+        <h3 data-i18n="step4_title">기록 확인</h3>
+        <p data-i18n="step4_desc">훈련 점수와 랭킹이 서버에 저장됩니다. 나의 성장 기록을 확인하고 다른 사용자와 비교해보세요.</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- FAQ -->
-<section class="section section-alt" id="faq">
+<section class="section" id="faq">
   <div class="inner">
     <div class="section-title">
-      <div class="label">자주 묻는 질문</div>
-      <h2>궁금한 점을 해결해드립니다</h2>
+      <div class="label" data-i18n="faq_label">자주 묻는 질문</div>
+      <h2 data-i18n="faq_h2">궁금한 점이 있으신가요?</h2>
     </div>
     <div class="faq-list">
       <div class="faq-item">
-        <div class="faq-q">스마트폰으로도 이용 가능한가요?</div>
-        <div class="faq-a">네, 스마트폰, 태블릿, PC 모두에서 사용 가능합니다. 별도의 앱 설치 없이 인터넷 브라우저(Chrome, Safari 등)로 바로 접속하시면 됩니다. 홈 화면에 추가하면 앱처럼 전체화면으로 이용하실 수 있습니다.</div>
+        <div class="faq-q" data-i18n="faq1_q">어떤 기기에서도 사용할 수 있나요?</div>
+        <div class="faq-a" data-i18n="faq1_a">스마트폰, 태블릿, PC 모두 사용 가능합니다. 특히 큰 화면의 태블릿이나 PC에서 더욱 쾌적하게 훈련할 수 있습니다. iOS Safari, Android Chrome, 데스크톱 Chrome/Edge 모두 지원합니다.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">훈련 효과가 나타나려면 얼마나 걸리나요?</div>
-        <div class="faq-a">개인차가 있지만, 하루 30분씩 2주 이상 꾸준히 훈련하면 집중력과 기억력의 변화를 체감하실 수 있습니다. 단기간 집중 훈련보다 매일 꾸준한 훈련이 훨씬 효과적입니다.</div>
+        <div class="faq-q" data-i18n="faq2_q">점수와 랭킹은 어떻게 저장되나요?</div>
+        <div class="faq-a" data-i18n="faq2_a">이름을 등록하면 전체 랭킹과 나의 점수가 서버에 저장됩니다. 언제 어디서나 나의 훈련 기록을 확인할 수 있으며, 다른 사용자들과 점수를 비교할 수 있습니다.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">훈련 데이터와 점수가 저장되나요?</div>
-        <div class="faq-a">네, 이름을 등록하면 전체 랭킹과 나의 점수가 서버에 저장됩니다. 언제 어디서나 나의 훈련 기록을 확인할 수 있으며, 다른 사용자들과 점수를 비교할 수 있습니다.</div>
+        <div class="faq-q" data-i18n="faq3_q">비용이 드나요? 완전 무료인가요?</div>
+        <div class="faq-a" data-i18n="faq3_a">기본 훈련 프로그램은 완전히 무료입니다. 추가 데이터팩(성경 확장팩 등)도 모두 무료로 제공됩니다. 광고 수익의 50%는 기독교 선교 사역에 사용됩니다.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">비용이 드나요? 완전 무료인가요?</div>
-        <div class="faq-a">기본 훈련 프로그램은 완전히 무료입니다. 추가 데이터팩(성경 확장팩 등)도 모두 무료로 제공됩니다. 광고 수익의 50%는 기독교 선교 사역에 사용됩니다.</div>
+        <div class="faq-q" data-i18n="faq4_q">시니어도 쉽게 사용할 수 있나요?</div>
+        <div class="faq-a" data-i18n="faq4_a">네, 시니어를 위해 특별히 설계된 프로그램입니다. 글자 크기가 크고, 조작이 단순하며, 훈련 속도를 자유롭게 조절할 수 있습니다. 수준을 '하'로 설정하면 누구나 쉽게 시작하실 수 있습니다.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">시니어도 쉽게 사용할 수 있나요?</div>
-        <div class="faq-a">네, 시니어를 위해 특별히 설계된 프로그램입니다. 글자 크기가 크고, 조작이 단순하며, 훈련 속도를 자유롭게 조절할 수 있습니다. 수준을 '하'로 설정하면 누구나 쉽게 시작하실 수 있습니다.</div>
+        <div class="faq-q" data-i18n="faq5_q">어떤 순서로 훈련하는 것이 좋나요?</div>
+        <div class="faq-a" data-i18n="faq5_a">① 시력강화 훈련(준비 운동) → ② 집중력 훈련 → ③ 기억력 훈련 → ④ 문장기억 훈련 → ⑤ 독서능력 향상 순서를 권장합니다. 처음에는 '하' 레벨로 시작하여 80점 이상이면 다음 레벨로 진행하세요.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">어떤 순서로 훈련하는 것이 좋나요?</div>
-        <div class="faq-a">① 시력강화 훈련(준비 운동) → ② 집중력 훈련 → ③ 기억력 훈련 → ④ 문장기억 훈련 → ⑤ 독서능력 향상 순서를 권장합니다. 처음에는 '하' 레벨로 시작하여 80점 이상이면 다음 레벨로 진행하세요.</div>
+        <div class="faq-q" data-i18n="faq6_q">인터넷이 없어도 사용할 수 있나요?</div>
+        <div class="faq-a" data-i18n="faq6_a">처음 한 번 사이트를 방문하면 PWA 기술로 오프라인에서도 기본 훈련이 가능합니다. 홈 화면에 추가 후 데이터팩을 한 번 저장하시면 인터넷 없이도 영구적으로 사용하실 수 있습니다.</div>
       </div>
       <div class="faq-item">
-        <div class="faq-q">인터넷이 없어도 사용할 수 있나요?</div>
-        <div class="faq-a">처음 한 번 사이트를 방문하면 PWA(Progressive Web App) 기술로 오프라인에서도 기본 훈련이 가능합니다. 홈 화면에 추가 후 데이터팩을 한 번 저장하시면 인터넷 없이도 영구적으로 사용하실 수 있습니다.</div>
+        <div class="faq-q" data-i18n="faq7_q">일본어·스페인어 훈련도 한국어와 동일한가요?</div>
+        <div class="faq-a" data-i18n="faq7_a">네, 동일한 5가지 두뇌 훈련을 각 언어의 어휘와 문장으로 제공합니다. 외국어 학습자에게는 언어 실력과 두뇌 훈련을 동시에 향상시키는 효과가 있습니다.</div>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- BOARD -->
+<section class="board-section" id="board">
+  <div class="board-wrap">
+    <div class="section-title" style="margin-bottom:32px">
+      <div class="label" data-i18n="board_label">커뮤니티</div>
+      <h2 data-i18n="board_h2">훈련 경험을<br>나눠주세요</h2>
+      <p data-i18n="board_p">훈련 후기, 건강 정보, 궁금한 점을 자유롭게 남겨주세요. 3가지 언어로 소통할 수 있습니다.</p>
+    </div>
+
+    <!-- 글 작성 폼 -->
+    <div class="board-form">
+      <div class="board-form-title">📝 <span data-i18n="board_write">글 작성</span></div>
+      <div class="board-row">
+        <input type="text" id="post-name" class="board-input" placeholder="이름 (닉네임)" maxlength="20" data-placeholder-i18n="board_name_ph">
+        <select id="post-lang" class="board-lang-select">
+          <option value="kor">🇰🇷 한국어</option>
+          <option value="jpn">🇯🇵 日本語</option>
+          <option value="esp">🇪🇸 Español</option>
+        </select>
+      </div>
+      <textarea id="post-content" class="board-textarea" placeholder="훈련 후기나 두뇌 건강 정보를 공유해주세요. (최대 500자)" maxlength="500" data-placeholder-i18n="board_content_ph"></textarea>
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <button class="btn-submit" id="btn-post-submit" onclick="submitPost()" data-i18n="board_submit">등록하기</button>
+        <div class="board-msg" id="board-msg"></div>
+      </div>
+    </div>
+
+    <!-- 글 목록 -->
+    <div class="post-list-title">💬 <span data-i18n="board_list">전체 글</span></div>
+    <div id="post-list">
+      <div class="no-post" data-i18n="board_loading">불러오는 중...</div>
     </div>
   </div>
 </section>
 
 <!-- CTA BANNER -->
 <section class="cta-banner">
-  <h2>오늘부터 시작하세요<br>두뇌는 훈련할수록 강해집니다</h2>
-  <p>매일 30분, 꾸준한 두뇌 훈련으로 더 건강하고 활기찬 노후를 만들어 가세요</p>
-  <a href="/kor/app.html" class="btn-cta">▶ 지금 무료로 시작하기</a>
+  <h2 data-i18n="cta_h2">오늘부터 시작하세요<br>두뇌는 훈련할수록 강해집니다</h2>
+  <p data-i18n="cta_p">매일 30분, 꾸준한 두뇌 훈련으로 더 건강하고 활기찬 노후를 만들어 가세요</p>
+  <a href="/kor/app.html" class="btn-cta" data-i18n="cta_btn">▶ 지금 무료로 시작하기</a>
 </section>
 
 <!-- FOOTER -->
@@ -652,34 +664,35 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
     <div class="footer-top">
       <div class="footer-brand">
         <div class="logo-text">🧠 JS 두뇌훈련</div>
-        <p>시력강화·집중력·기억력·문장기억·독서능력<br>5가지 두뇌 훈련 무료 제공<br><br>광고 수익의 50%는 기독교 선교 사역에 사용됩니다.</p>
+        <p>시력강화·집중력·기억력·문장기억·독서능력<br>5가지 두뇌 훈련 무료 제공<br>한국어 · 日本語 · Español<br><br>광고 수익의 50%는 기독교 선교 사역에 사용됩니다.</p>
       </div>
       <div class="footer-col">
-        <h4>훈련 프로그램</h4>
+        <h4 data-i18n="footer_training">훈련 프로그램</h4>
         <ul>
-          <li><a href="/kor/app.html">훈련 시작하기</a></li>
-          <li><a href="#training">5가지 훈련 소개</a></li>
-          <li><a href="#howto">사용 방법</a></li>
-          <li><a href="#faq">자주 묻는 질문</a></li>
+          <li><a href="/kor/app.html">🇰🇷 한국어 훈련</a></li>
+          <li><a href="/jpn/app_jpn.html">🇯🇵 日本語 トレーニング</a></li>
+          <li><a href="/esp/app_esp.html">🇪🇸 Entrenamiento Español</a></li>
+          <li><a href="#training" data-i18n="footer_intro">5가지 훈련 소개</a></li>
         </ul>
       </div>
       <div class="footer-col">
-        <h4>정보</h4>
+        <h4 data-i18n="footer_info">정보</h4>
         <ul>
-          <li><a href="privacy.html">개인정보처리방침</a></li>
-          <li><a href="terms.html">이용약관</a></li>
-          <li><a href="mailto:jsmylife153@gmail.com">문의하기</a></li>
+          <li><a href="/kor/privacy.html" data-i18n="footer_privacy">개인정보처리방침</a></li>
+          <li><a href="/kor/terms.html" data-i18n="footer_terms">이용약관</a></li>
+          <li><a href="#board" data-i18n="footer_board">게시판</a></li>
+          <li><a href="mailto:jsmylife153@gmail.com" data-i18n="footer_contact">문의하기</a></li>
         </ul>
       </div>
     </div>
     <div class="footer-bottom">
       <p>© 2025 JS 두뇌훈련 · 개발자: 조성형 · jsmylife153@gmail.com</p>
-      <p>본 사이트는 의료적 진단이나 치료를 목적으로 하지 않습니다.</p>
+      <p data-i18n="footer_disclaimer">본 사이트는 의료적 진단이나 치료를 목적으로 하지 않습니다.</p>
     </div>
   </div>
 </footer>
 
-<!-- ARTICLE MODALS -->
+<!-- ARTICLE MODAL -->
 <div class="article-overlay" id="overlay" onclick="if(event.target===this)closeArticle()">
   <div class="article-box">
     <button class="article-close" onclick="closeArticle()">✕</button>
@@ -688,273 +701,272 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 </div>
 
 <script>
-// iOS smooth scroll polyfill
-document.querySelectorAll('a[href^="#"]').forEach(function(a){
-  a.addEventListener('click',function(e){
-    var target=document.querySelector(this.getAttribute('href'));
-    if(!target)return;
-    e.preventDefault();
-    target.scrollIntoView({behavior:'smooth',block:'start'});
+// ── i18n 데이터
+const i18n = {
+  kor: {
+    site_name:"두뇌훈련", nav_training:"훈련 소개", nav_lang:"언어 선택", nav_blog:"두뇌 건강 정보",
+    nav_board:"게시판", nav_start:"▶ 훈련 시작",
+    hero_badge:"✅ 완전 무료 · 앱 설치 불필요 · 시니어 특화",
+    hero_h1:"두뇌가 젊어지는 <em>30분</em>,<br>매일 꾸준히",
+    hero_p:"시력강화·집중력·기억력·문장기억·독서능력<br>5가지 과학적 두뇌 훈련으로 치매를 예방하세요",
+    hero_sub:"훈련 소개 보기",
+    stat1_unit:"주", stat1_label:"꾸준히 훈련하면<br>집중력 변화 체감",
+    stat2_unit:"분", stat2_label:"하루 권장 훈련 시간<br>부담 없이 시작",
+    stat3_unit:"가지", stat3_label:"두뇌 훈련 모드<br>한 번에 해결",
+    stat4_unit:"개", stat4_label:"지원 언어<br>한국어·日本語·Español",
+    train_label:"5가지 두뇌 훈련",
+    train_h2:"과학적으로 설계된<br>두뇌 강화 프로그램",
+    train_p:"각 훈련은 뇌의 서로 다른 영역을 자극하여 종합적인 인지 기능 향상을 돕습니다",
+    train_cta:"▶ 5가지 훈련 지금 시작하기",
+    t1_title:"시력강화 훈련", t1_desc:"격자 위를 이동하는 도형을 눈으로 추적하며 안구 근육을 단련하고 시야를 확장합니다", t1_badge:"준비 운동",
+    t2_title:"집중력 훈련", t2_desc:"순식간에 나타났다 사라지는 낱말을 포착하는 훈련으로 순간 인식력과 주의력을 키웁니다", t2_badge:"핵심 훈련",
+    t3_title:"기억력 훈련", t3_desc:"여러 위치에 등장하는 낱말을 기억하는 훈련으로 단기 기억력과 작업 기억을 강화합니다", t3_badge:"핵심 훈련",
+    t4_title:"문장기억 훈련", t4_desc:"여러 문장 속 낱말의 위치를 기억하는 훈련으로 독해력과 문맥 파악 능력을 향상시킵니다", t4_badge:"심화 훈련",
+    t5_title:"독서능력 향상", t5_desc:"장문을 읽고 퀴즈로 이해도를 확인하는 훈련으로 독서 속도와 이해력을 함께 높입니다", t5_badge:"독해 훈련",
+    lang_label:"MULTILINGUAL", lang_h2:"원하는 언어로<br>두뇌 훈련을 시작하세요", lang_p:"한국어, 일본어, 스페인어로 동일한 두뇌 훈련을 제공합니다",
+    blog_label:"두뇌 건강 정보", blog_h2:"시니어 두뇌 건강<br>꼭 알아야 할 정보", blog_p:"치매 예방부터 기억력 향상까지, 전문가가 검증한 두뇌 건강 정보를 제공합니다",
+    howto_label:"사용 방법", howto_h2:"3단계로 시작하는<br>두뇌 훈련",
+    step1_title:"언어 선택", step1_desc:"한국어, 일본어, 스페인어 중 원하는 언어를 선택하세요.",
+    step2_title:"수준 설정", step2_desc:"처음이라면 '하' 수준부터 시작하세요. 80점 이상이면 다음 수준으로 추천됩니다.",
+    step3_title:"매일 30분", step3_desc:"5가지 훈련을 순서대로 진행하세요. 2주만 꾸준히 하면 변화를 느끼실 수 있습니다.",
+    step4_title:"기록 확인", step4_desc:"훈련 점수와 랭킹이 서버에 저장됩니다. 나의 성장 기록을 확인해보세요.",
+    faq_label:"자주 묻는 질문", faq_h2:"궁금한 점이 있으신가요?",
+    faq1_q:"어떤 기기에서도 사용할 수 있나요?", faq1_a:"스마트폰, 태블릿, PC 모두 사용 가능합니다. iOS Safari, Android Chrome, 데스크톱 Chrome/Edge 모두 지원합니다.",
+    faq2_q:"점수와 랭킹은 어떻게 저장되나요?", faq2_a:"이름을 등록하면 전체 랭킹과 나의 점수가 서버에 저장됩니다. 언제 어디서나 나의 훈련 기록을 확인할 수 있습니다.",
+    faq3_q:"비용이 드나요? 완전 무료인가요?", faq3_a:"기본 훈련 프로그램은 완전히 무료입니다. 광고 수익의 50%는 기독교 선교 사역에 사용됩니다.",
+    faq4_q:"시니어도 쉽게 사용할 수 있나요?", faq4_a:"네, 시니어를 위해 특별히 설계된 프로그램입니다. 글자 크기가 크고, 조작이 단순하며, 수준을 '하'로 설정하면 누구나 쉽게 시작하실 수 있습니다.",
+    faq5_q:"어떤 순서로 훈련하는 것이 좋나요?", faq5_a:"① 시력강화 → ② 집중력 → ③ 기억력 → ④ 문장기억 → ⑤ 독서능력 순서를 권장합니다.",
+    faq6_q:"인터넷이 없어도 사용할 수 있나요?", faq6_a:"처음 한 번 방문하면 PWA 기술로 오프라인에서도 기본 훈련이 가능합니다.",
+    faq7_q:"일본어·스페인어 훈련도 한국어와 동일한가요?", faq7_a:"네, 동일한 5가지 두뇌 훈련을 각 언어의 어휘와 문장으로 제공합니다.",
+    board_label:"커뮤니티", board_h2:"훈련 경험을<br>나눠주세요", board_p:"훈련 후기, 건강 정보, 궁금한 점을 자유롭게 남겨주세요.",
+    board_write:"글 작성", board_name_ph:"이름 (닉네임)", board_content_ph:"훈련 후기나 두뇌 건강 정보를 공유해주세요. (최대 500자)",
+    board_submit:"등록하기", board_list:"전체 글", board_loading:"불러오는 중...", board_empty:"첫 번째 글을 남겨보세요!",
+    board_ok:"등록되었습니다!", board_err:"등록에 실패했습니다. 다시 시도해주세요.",
+    cta_h2:"오늘부터 시작하세요<br>두뇌는 훈련할수록 강해집니다", cta_p:"매일 30분, 꾸준한 두뇌 훈련으로 더 건강하고 활기찬 노후를 만들어 가세요", cta_btn:"▶ 지금 무료로 시작하기",
+    footer_training:"훈련 프로그램", footer_intro:"5가지 훈련 소개", footer_info:"정보",
+    footer_privacy:"개인정보처리방침", footer_terms:"이용약관", footer_board:"게시판", footer_contact:"문의하기",
+    footer_disclaimer:"본 사이트는 의료적 진단이나 치료를 목적으로 하지 않습니다."
+  },
+  jpn: {
+    site_name:"脳トレーニング", nav_training:"トレーニング紹介", nav_lang:"言語選択", nav_blog:"脳健康情報",
+    nav_board:"掲示板", nav_start:"▶ トレーニング開始",
+    hero_badge:"✅ 完全無料 · アプリ不要 · シニア特化",
+    hero_h1:"脳が若返る<em>30分</em>、<br>毎日続けよう",
+    hero_p:"視力強化・集中力・記憶力・文章記憶・読書能力<br>5つの科学的な脳トレで認知症を予防しましょう",
+    hero_sub:"トレーニング紹介を見る",
+    stat1_unit:"週", stat1_label:"継続すれば<br>集中力の変化を実感",
+    stat2_unit:"分", stat2_label:"1日の推奨トレーニング時間",
+    stat3_unit:"種類", stat3_label:"脳トレモード<br>一度に解決",
+    stat4_unit:"言語", stat4_label:"対応言語<br>韓国語·日本語·Español",
+    train_label:"5つの脳トレーニング",
+    train_h2:"科学的に設計された<br>脳強化プログラム",
+    train_p:"各トレーニングは脳の異なる領域を刺激し、総合的な認知機能の向上を助けます",
+    train_cta:"▶ 5つのトレーニングを今すぐ始める",
+    t1_title:"視力強化トレーニング", t1_desc:"格子上を移動する図形を目で追跡し、眼筋を鍛えて視野を拡張します", t1_badge:"準備運動",
+    t2_title:"集中力トレーニング", t2_desc:"瞬時に現れて消える単語を捉える訓練で、瞬間認識力と注意力を鍛えます", t2_badge:"コアトレーニング",
+    t3_title:"記憶力トレーニング", t3_desc:"複数の位置に登場する単語を記憶する訓練で、短期記憶力と作業記憶を強化します", t3_badge:"コアトレーニング",
+    t4_title:"文章記憶トレーニング", t4_desc:"複数の文章の中の単語の位置を記憶する訓練で、読解力と文脈把握能力を向上させます", t4_badge:"応用トレーニング",
+    t5_title:"読書能力向上", t5_desc:"長文を読んでクイズで理解度を確認する訓練で、読書速度と理解力を共に高めます", t5_badge:"読解トレーニング",
+    lang_label:"MULTILINGUAL", lang_h2:"お好みの言語で<br>脳トレを始めましょう", lang_p:"韓国語、日本語、スペイン語で同じ脳トレを提供します",
+    blog_label:"脳健康情報", blog_h2:"シニアの脳健康<br>必ず知っておきたい情報", blog_p:"認知症予防から記憶力向上まで、専門家が検証した脳健康情報を提供します",
+    howto_label:"使い方", howto_h2:"3ステップで始める<br>脳トレーニング",
+    step1_title:"言語選択", step1_desc:"韓国語、日本語、スペイン語の中からお好みの言語を選択してください。",
+    step2_title:"レベル設定", step2_desc:"初めての方は「低」レベルから始めましょう。80点以上で次のレベルを推薦します。",
+    step3_title:"毎日30分", step3_desc:"5つのトレーニングを順番に進めましょう。2週間続ければ変化を感じられます。",
+    step4_title:"記録確認", step4_desc:"トレーニングのスコアとランキングがサーバーに保存されます。",
+    faq_label:"よくある質問", faq_h2:"何かご不明な点はありますか？",
+    faq1_q:"どんな端末でも使えますか？", faq1_a:"スマートフォン、タブレット、PCすべてで使用可能です。iOS Safari、Android Chrome、デスクトップChrome/Edgeすべて対応しています。",
+    faq2_q:"スコアとランキングはどのように保存されますか？", faq2_a:"名前を登録すると、全体ランキングとスコアがサーバーに保存されます。",
+    faq3_q:"費用はかかりますか？完全無料ですか？", faq3_a:"基本トレーニングプログラムは完全無料です。広告収益の50%はキリスト教宣教活動に使用されます。",
+    faq4_q:"シニアでも簡単に使えますか？", faq4_a:"はい、シニアのために特別に設計されたプログラムです。文字が大きく、操作が簡単で、「低」レベルから誰でも簡単に始められます。",
+    faq5_q:"どの順序でトレーニングするのが良いですか？", faq5_a:"① 視力強化 → ② 集中力 → ③ 記憶力 → ④ 文章記憶 → ⑤ 読書能力の順をお勧めします。",
+    faq6_q:"インターネットがなくても使えますか？", faq6_a:"一度サイトを訪問すればPWA技術でオフラインでも基本トレーニングが可能です。",
+    faq7_q:"日本語・スペイン語のトレーニングも韓国語と同じですか？", faq7_a:"はい、同じ5つの脳トレを各言語の語彙と文章で提供します。",
+    board_label:"コミュニティ", board_h2:"トレーニング体験を<br>シェアしてください", board_p:"トレーニングの感想、健康情報、ご質問を自由に書いてください。",
+    board_write:"投稿作成", board_name_ph:"名前（ニックネーム）", board_content_ph:"トレーニングの感想や脳健康情報をシェアしてください。（最大500文字）",
+    board_submit:"投稿する", board_list:"すべての投稿", board_loading:"読み込み中...", board_empty:"最初の投稿を書いてみましょう！",
+    board_ok:"投稿されました！", board_err:"投稿に失敗しました。もう一度お試しください。",
+    cta_h2:"今日から始めましょう<br>脳はトレーニングするほど強くなります", cta_p:"毎日30分、継続的な脳トレでより健康で活気ある老後を作りましょう", cta_btn:"▶ 今すぐ無料で始める",
+    footer_training:"トレーニング", footer_intro:"5つのトレーニング紹介", footer_info:"情報",
+    footer_privacy:"プライバシーポリシー", footer_terms:"利用規約", footer_board:"掲示板", footer_contact:"お問い合わせ",
+    footer_disclaimer:"本サイトは医療診断や治療を目的としていません。"
+  },
+  esp: {
+    site_name:"Entrenamiento Cerebral", nav_training:"Entrenamientos", nav_lang:"Idioma", nav_blog:"Salud Cerebral",
+    nav_board:"Foro", nav_start:"▶ Comenzar",
+    hero_badge:"✅ Completamente Gratis · Sin App · Para Mayores",
+    hero_h1:"Rejuvenece tu cerebro<br>en <em>30 minutos</em> diarios",
+    hero_p:"Visión·Concentración·Memoria·Frases·Lectura<br>5 entrenamientos científicos para prevenir el Alzheimer",
+    hero_sub:"Ver los entrenamientos",
+    stat1_unit:"sem.", stat1_label:"De práctica constante para<br>notar la diferencia",
+    stat2_unit:"min.", stat2_label:"Tiempo diario recomendado",
+    stat3_unit:"tipos", stat3_label:"Modos de entrenamiento<br>en un solo lugar",
+    stat4_unit:"idiomas", stat4_label:"Disponible en<br>Coreano·日本語·Español",
+    train_label:"5 ENTRENAMIENTOS CEREBRALES",
+    train_h2:"Un programa diseñado<br>científicamente",
+    train_p:"Cada entrenamiento estimula diferentes áreas del cerebro para una mejora cognitiva integral",
+    train_cta:"▶ Comenzar los 5 entrenamientos ahora",
+    t1_title:"Entrenamiento Visual", t1_desc:"Sigue con los ojos figuras en movimiento para fortalecer los músculos oculares y ampliar el campo visual", t1_badge:"Calentamiento",
+    t2_title:"Concentración", t2_desc:"Captura palabras que aparecen y desaparecen en instantes para desarrollar la atención y el reconocimiento", t2_badge:"Entrenamiento clave",
+    t3_title:"Memoria", t3_desc:"Recuerda palabras en múltiples posiciones para fortalecer la memoria a corto plazo y la memoria de trabajo", t3_badge:"Entrenamiento clave",
+    t4_title:"Memoria de Frases", t4_desc:"Recuerda la posición de palabras en varias frases para mejorar la comprensión lectora y el análisis de contexto", t4_badge:"Nivel avanzado",
+    t5_title:"Velocidad Lectora", t5_desc:"Lee textos largos y verifica la comprensión con cuestionarios para mejorar la velocidad y comprensión lectora", t5_badge:"Comprensión",
+    lang_label:"MULTILINGÜE", lang_h2:"Elige tu idioma y<br>comienza a entrenar", lang_p:"El mismo entrenamiento cerebral disponible en coreano, japonés y español",
+    blog_label:"SALUD CEREBRAL", blog_h2:"Información esencial<br>para la salud mental del mayor", blog_p:"Desde la prevención del Alzheimer hasta mejorar la memoria, información verificada por expertos",
+    howto_label:"CÓMO FUNCIONA", howto_h2:"Comienza en<br>3 pasos",
+    step1_title:"Elige tu idioma", step1_desc:"Selecciona entre coreano, japonés y español. Recibirás el mismo entrenamiento en tu idioma preferido.",
+    step2_title:"Configura el nivel", step2_desc:"Si es tu primera vez, comienza en nivel 'Bajo'. Con más de 80 puntos, pasas al siguiente nivel.",
+    step3_title:"30 minutos al día", step3_desc:"Realiza los 5 entrenamientos en orden. En 2 semanas notarás la diferencia en concentración y memoria.",
+    step4_title:"Revisa tu progreso", step4_desc:"Tus puntuaciones y ranking se guardan en el servidor. Sigue tu evolución y compárate con otros.",
+    faq_label:"PREGUNTAS FRECUENTES", faq_h2:"¿Tienes alguna pregunta?",
+    faq1_q:"¿Se puede usar en cualquier dispositivo?", faq1_a:"Compatible con smartphone, tablet y PC. Compatible con iOS Safari, Android Chrome y Chrome/Edge en escritorio.",
+    faq2_q:"¿Cómo se guardan los puntos y el ranking?", faq2_a:"Al registrar tu nombre, tus puntos y ranking global se guardan en el servidor para consultarlos en cualquier momento.",
+    faq3_q:"¿Tiene algún costo? ¿Es completamente gratis?", faq3_a:"El programa de entrenamiento básico es completamente gratuito. El 50% de los ingresos por publicidad se destina a misiones cristianas.",
+    faq4_q:"¿Pueden usarlo personas mayores fácilmente?", faq4_a:"Sí, está especialmente diseñado para personas mayores. Letra grande, operación sencilla y velocidad ajustable. Con el nivel 'Bajo' cualquiera puede empezar.",
+    faq5_q:"¿En qué orden es mejor entrenar?", faq5_a:"① Visión → ② Concentración → ③ Memoria → ④ Frases → ⑤ Lectura. Recomendamos empezar en nivel 'Bajo' y avanzar con más de 80 puntos.",
+    faq6_q:"¿Se puede usar sin internet?", faq6_a:"Con una primera visita, la tecnología PWA permite el entrenamiento básico sin conexión.",
+    faq7_q:"¿Los entrenamientos en japonés y español son iguales al coreano?", faq7_a:"Sí, los mismos 5 entrenamientos con vocabulario y frases en cada idioma.",
+    board_label:"COMUNIDAD", board_h2:"Comparte tu experiencia<br>de entrenamiento", board_p:"Deja tu opinión, información de salud o preguntas. Puedes comunicarte en 3 idiomas.",
+    board_write:"Escribir", board_name_ph:"Nombre (apodo)", board_content_ph:"Comparte tu experiencia o información sobre salud cerebral. (máx. 500 caracteres)",
+    board_submit:"Publicar", board_list:"Todas las publicaciones", board_loading:"Cargando...", board_empty:"¡Sé el primero en escribir!",
+    board_ok:"¡Publicado con éxito!", board_err:"Error al publicar. Por favor, inténtalo de nuevo.",
+    cta_h2:"Empieza hoy mismo<br>Tu cerebro se fortalece con el entrenamiento", cta_p:"30 minutos al día para una vejez más saludable y activa", cta_btn:"▶ Comenzar gratis ahora",
+    footer_training:"Entrenamientos", footer_intro:"Introducción a los 5 entrenamientos", footer_info:"Información",
+    footer_privacy:"Política de privacidad", footer_terms:"Términos de uso", footer_board:"Foro", footer_contact:"Contacto",
+    footer_disclaimer:"Este sitio no tiene fines de diagnóstico ni tratamiento médico."
+  }
+};
+
+let currentLang = "kor";
+
+function setLang(lang) {
+  currentLang = lang;
+  document.getElementById("html-root").lang = lang === "kor" ? "ko" : lang === "jpn" ? "ja" : "es";
+  ["kor","jpn","esp"].forEach(l => {
+    document.getElementById("btn-"+l).classList.toggle("active", l===lang);
   });
-});
+  const t = i18n[lang];
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.dataset.i18n;
+    if(t[key] !== undefined) el.innerHTML = t[key];
+  });
+  document.querySelectorAll("[data-placeholder-i18n]").forEach(el => {
+    const key = el.dataset.placeholderI18n;
+    if(t[key]) el.placeholder = t[key];
+  });
+  // 헤더 훈련 시작 버튼 href 업데이트
+  const startBtn = document.querySelector("nav .btn-start");
+  if(startBtn) {
+    startBtn.href = lang === "kor" ? "/kor/app.html" : lang === "jpn" ? "/jpn/app_jpn.html" : "/esp/app_esp.html";
+  }
+  // CTA 버튼
+  const ctaBtn = document.querySelector(".btn-cta");
+  if(ctaBtn) {
+    ctaBtn.href = lang === "kor" ? "/kor/app.html" : lang === "jpn" ? "/jpn/app_jpn.html" : "/esp/app_esp.html";
+  }
+  // 게시판 언어 select 업데이트
+  const sel = document.getElementById("post-lang");
+  if(sel) sel.value = lang;
+  // 게시판 재로드
+  if(window._loadPosts) window._loadPosts();
+}
+
+// ── 게시판 글 등록
+async function submitPost() {
+  const name = document.getElementById("post-name").value;
+  const content = document.getElementById("post-content").value;
+  const lang = document.getElementById("post-lang").value;
+  const msg = document.getElementById("board-msg");
+  const btn = document.getElementById("btn-post-submit");
+  const t = i18n[currentLang];
+
+  if(!name.trim() || !content.trim()) {
+    msg.textContent = "이름과 내용을 입력해주세요.";
+    msg.className = "board-msg err";
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = "...";
+  const ok = await window._submitPost(name, content, lang);
+  if(ok) {
+    msg.textContent = t.board_ok || "등록되었습니다!";
+    msg.className = "board-msg ok";
+    document.getElementById("post-content").value = "";
+    if(window._loadPosts) window._loadPosts();
+  } else {
+    msg.textContent = t.board_err || "등록에 실패했습니다.";
+    msg.className = "board-msg err";
+  }
+  btn.disabled = false;
+  btn.textContent = t.board_submit || "등록하기";
+  setTimeout(()=>{ msg.textContent=""; }, 4000);
+}
 
 // ── 스크롤 애니메이션
 if('IntersectionObserver' in window){
-  const obs=new IntersectionObserver(function(entries){
-    entries.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('visible'); });
-  },{threshold:0.12});
-  document.querySelectorAll('.fade-up').forEach(function(el){obs.observe(el);});
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+  }, {threshold:0.12});
+  document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
 } else {
-  // 구형 iOS Safari: 즉시 표시
-  document.querySelectorAll('.fade-up').forEach(function(el){el.classList.add('visible');});
+  document.querySelectorAll('.fade-up').forEach(el => el.classList.add('visible'));
 }
 
 // ── FAQ 토글
-document.querySelectorAll('.faq-q').forEach(q=>{
-  q.addEventListener('click',()=>{
+document.querySelectorAll('.faq-q').forEach(q => {
+  q.addEventListener('click', () => {
     const item = q.parentElement;
     const isOpen = item.classList.contains('open');
-    document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
     if(!isOpen) item.classList.add('open');
   });
 });
 
-// ── 아티클 데이터
+// ── 스크롤 부드러운 이동
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if(!target) return;
+    e.preventDefault();
+    target.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+});
+
+// ── 아티클 모달
 const articles = {
-  a1:{
-    tag:'치매 예방',
-    title:'치매 예방을 위한 두뇌 훈련 7가지',
-    content:`
-<h3>치매, 막을 수 있습니다</h3>
-<p>세계보건기구(WHO)에 따르면 전 세계 치매 환자 수는 5,000만 명을 넘어섰으며, 2050년에는 1억 5,200만 명에 달할 것으로 예상됩니다. 한국의 경우 65세 이상 노인 10명 중 1명이 치매를 앓고 있습니다.</p>
-<p>하지만 희망적인 사실이 있습니다. 연구에 따르면 치매의 약 40%는 예방 가능하며, 꾸준한 두뇌 훈련으로 치매 발생 위험을 최대 35% 낮출 수 있습니다.</p>
-<h3>치매 예방에 효과적인 두뇌 훈련 7가지</h3>
-<ul>
-<li><strong>1. 집중력 훈련</strong> — 순간적으로 나타나는 자극에 반응하는 훈련은 전두엽 기능을 강화합니다.</li>
-<li><strong>2. 기억력 훈련</strong> — 단기 기억을 장기 기억으로 전환하는 훈련으로 해마 기능을 강화합니다.</li>
-<li><strong>3. 독서 훈련</strong> — 장문을 읽고 이해하는 훈련이 언어 중추와 기억 회로를 동시에 자극합니다.</li>
-<li><strong>4. 안구 운동</strong> — 눈의 움직임을 훈련하면 뇌 혈류가 개선되어 전반적인 인지 기능이 향상됩니다.</li>
-<li><strong>5. 언어 학습</strong> — 새로운 언어를 배우면 인지 예비력(Cognitive Reserve)이 증가합니다.</li>
-<li><strong>6. 음악 감상 및 연주</strong> — 음악은 뇌의 광범위한 영역을 동시에 자극합니다.</li>
-<li><strong>7. 사회적 교류</strong> — 대화와 사회 참여는 전두엽 기능을 유지하는 데 핵심적입니다.</li>
-</ul>
-<h3>얼마나 해야 효과가 있나요?</h3>
-<p>미국 신경학 저널(Neurology)에 게재된 연구에 따르면, 일주일에 최소 5회, 하루 20~30분 이상의 인지 활동이 치매 예방에 유의미한 효과를 보였습니다. 중요한 것은 강도보다 꾸준함입니다.</p>
-<p>JS 두뇌훈련의 5가지 훈련 프로그램은 위에서 소개한 치매 예방 활동을 모두 포함하도록 설계되었습니다. 매일 30분씩 꾸준히 훈련해보세요.</p>
-<div class="article-source">출처: WHO Global Action Plan on Dementia 2017-2025, The Lancet Commission on Dementia 2020</div>`
-  },
-  a2:{
-    tag:'노화와 기억력',
-    title:'60대 이후 기억력 저하, 원인과 해결책',
-    content:`
-<h3>기억력이 떨어지는 이유</h3>
-<p>"어제 뭘 먹었더라?", "아까 뭘 하려고 했지?" — 이런 경험이 잦아졌다면 정상적인 노화 과정일 수 있습니다. 하지만 적극적인 대처가 필요합니다.</p>
-<p>60대 이후 기억력 저하의 주요 원인은 다음과 같습니다:</p>
-<ul>
-<li><strong>신경세포 감소</strong> — 뇌는 30대부터 매년 0.5%씩 부피가 줄어들며, 특히 기억을 담당하는 해마 부위가 취약합니다.</li>
-<li><strong>신경전달물질 변화</strong> — 도파민, 아세틸콜린 등 기억과 관련된 신경전달물질 분비가 감소합니다.</li>
-<li><strong>뇌 혈류 감소</strong> — 혈관이 좁아지면서 뇌에 공급되는 산소와 영양분이 줄어듭니다.</li>
-<li><strong>수면의 질 저하</strong> — 깊은 수면 중에 기억이 정리·저장되는데, 수면의 질이 떨어지면 기억력도 약해집니다.</li>
-</ul>
-<h3>효과적인 해결책</h3>
-<p>다행히 뇌는 평생 변화하고 성장할 수 있는 '신경 가소성'을 가지고 있습니다.</p>
-<ul>
-<li><strong>인지 훈련</strong> — 집중력·기억력 훈련으로 신경 연결을 강화합니다.</li>
-<li><strong>규칙적인 운동</strong> — 유산소 운동은 BDNF(뇌 신경 성장 인자)를 증가시켜 뇌세포 성장을 촉진합니다.</li>
-<li><strong>충분한 수면</strong> — 하루 7~8시간 수면으로 기억 강화 시간을 확보합니다.</li>
-<li><strong>사회적 교류</strong> — 대화와 사회 참여로 전두엽 기능을 유지합니다.</li>
-<li><strong>스트레스 관리</strong> — 만성 스트레스는 해마를 위축시킵니다. 명상, 기도 등으로 스트레스를 관리하세요.</li>
-</ul>
-<div class="article-source">출처: 대한신경과학회, Mayo Clinic Alzheimer's Disease Research Center</div>`
-  },
-  a3:{
-    tag:'속독 원리',
-    title:'속독의 원리 — 눈이 아닌 뇌로 읽는 법',
-    content:`
-<h3>당신의 독서 속도는?</h3>
-<p>한국인 평균 독서 속도는 분당 200~300자 수준입니다. 하지만 속독 훈련을 받은 사람은 분당 600~1,000자를 읽으면서도 이해도가 더 높은 경우가 많습니다. 그 비결은 무엇일까요?</p>
-<h3>독서의 두 가지 방해 요소</h3>
-<ul>
-<li><strong>머릿속 소리 읽기(Subvocalization)</strong> — 글을 읽을 때 머릿속으로 소리를 내는 습관입니다. 이 습관은 독서 속도를 말하는 속도(분당 150~200자)로 제한합니다.</li>
-<li><strong>좁은 시야(Word-by-Word Reading)</strong> — 한 번에 한 단어씩 읽는 습관입니다. 훈련을 통해 한 번에 3~5개 단어를 인식할 수 있습니다.</li>
-</ul>
-<h3>안구 운동과 속독의 관계</h3>
-<p>눈은 독서 중 부드럽게 움직이지 않고 '도약 운동(Saccade)'을 합니다. 일반 독자는 초당 3~4회, 속독 훈련자는 초당 6~8회 도약합니다.</p>
-<p>JS 두뇌훈련의 시력강화 훈련은 안구 근육을 단련하여 더 넓은 시야와 빠른 안구 운동을 가능하게 합니다. 독서능력 향상 훈련은 장문 읽기와 이해도 확인을 통해 종합적인 독서 능력을 키웁니다.</p>
-<h3>속독 훈련의 3단계</h3>
-<ul>
-<li><strong>1단계</strong> — 안구 근육 강화 (시력강화 훈련)</li>
-<li><strong>2단계</strong> — 순간 인식력 향상 (집중력 훈련)</li>
-<li><strong>3단계</strong> — 장문 독해 연습 (독서능력 향상 훈련)</li>
-</ul>
-<div class="article-source">출처: 한국독서교육연구원, Scientific American Mind - Speed Reading</div>`
-  },
-  a4:{
-    tag:'집중력',
-    title:'집중력이 3배 좋아지는 생활 습관 5가지',
-    content:`
-<h3>집중력은 훈련으로 키울 수 있습니다</h3>
-<p>집중력은 유전적으로 타고나는 것이 아닙니다. 올바른 생활 습관과 꾸준한 훈련으로 누구나 집중력을 크게 향상시킬 수 있습니다.</p>
-<h3>집중력을 높이는 5가지 생활 습관</h3>
-<ul>
-<li><strong>1. 포모도로 기법 활용</strong> — 25분 집중 + 5분 휴식을 반복합니다. 짧은 집중 시간이 오히려 뇌를 더 효율적으로 만듭니다.</li>
-<li><strong>2. 디지털 기기 알림 끄기</strong> — 스마트폰 알림은 집중을 깨고, 다시 집중하는 데 평균 23분이 소요됩니다. 훈련 중에는 반드시 알림을 꺼두세요.</li>
-<li><strong>3. 충분한 수면</strong> — 수면 부족은 집중력을 40% 감소시킵니다. 규칙적인 수면 시간을 지키는 것이 집중력 향상의 기본입니다.</li>
-<li><strong>4. 규칙적인 유산소 운동</strong> — 걷기, 자전거 타기 등 30분 이상의 유산소 운동은 전두엽 혈류를 증가시켜 집중력을 높입니다.</li>
-<li><strong>5. 매일 두뇌 훈련</strong> — 집중력 훈련 프로그램을 통한 체계적인 인지 훈련이 가장 직접적인 효과를 줍니다.</li>
-</ul>
-<h3>집중력 훈련의 과학적 원리</h3>
-<p>집중력은 전두엽의 '실행 기능(Executive Function)'과 관련이 있습니다. 순간적으로 나타나는 자극에 반응하는 훈련을 반복하면 전두엽의 신경 연결이 강화되어 실제 일상에서의 집중력이 향상됩니다.</p>
-<div class="article-source">출처: Harvard Health Publishing, American Psychological Association</div>`
-  },
-  a5:{
-    tag:'시니어 건강',
-    title:'시니어를 위한 하루 30분 두뇌 운동법',
-    content:`
-<h3>두뇌도 근육처럼 훈련이 필요합니다</h3>
-<p>몸의 근육은 운동하지 않으면 약해지듯, 뇌도 사용하지 않으면 기능이 저하됩니다. 특히 은퇴 후 사회적 활동이 줄어들면 뇌 자극이 감소하여 인지 기능 저하가 빨라질 수 있습니다.</p>
-<h3>하루 30분 두뇌 운동 프로그램</h3>
-<ul>
-<li><strong>준비 운동 (5분)</strong> — 시력강화 훈련으로 안구 근육을 풀어줍니다.</li>
-<li><strong>집중력 훈련 (10분)</strong> — 낱말 집중력 훈련으로 순간 인식력을 키웁니다.</li>
-<li><strong>기억력 훈련 (10분)</strong> — 기억력 또는 문장기억 훈련으로 단기 기억을 강화합니다.</li>
-<li><strong>독해 훈련 (5분)</strong> — 독서능력 향상 훈련으로 마무리합니다.</li>
-</ul>
-<h3>시니어 훈련 시 주의사항</h3>
-<ul>
-<li>처음에는 '하' 수준부터 시작하세요.</li>
-<li>눈의 피로를 느끼면 즉시 휴식을 취하세요.</li>
-<li>점수보다 꾸준함이 더 중요합니다.</li>
-<li>훈련 전 밝은 조명을 확보하세요.</li>
-<li>화면과의 거리는 40~60cm를 유지하세요.</li>
-</ul>
-<p>꾸준히 하루 30분씩 훈련하면 2~4주 후에 집중력과 기억력의 변화를 느끼실 수 있습니다.</p>
-<div class="article-source">출처: 서울대학교병원 노인건강연구소, 한국치매협회</div>`
-  },
-  a6:{
-    tag:'성경과 두뇌',
-    title:'성경 암송이 뇌 건강에 미치는 놀라운 영향',
-    content:`
-<h3>암송, 최고의 두뇌 훈련</h3>
-<p>성경을 암송하는 행위는 단순한 신앙 활동을 넘어 뇌 건강에도 탁월한 효과가 있습니다. 신경과학 연구들은 규칙적인 암송 활동이 해마 기능을 강화하고 알츠하이머 발병을 늦출 수 있음을 보여줍니다.</p>
-<h3>암송이 뇌에 미치는 3가지 효과</h3>
-<ul>
-<li><strong>해마 강화</strong> — 새로운 내용을 장기 기억에 저장하는 반복 학습이 해마의 신경 연결을 강화합니다.</li>
-<li><strong>언어 중추 활성화</strong> — 의미 있는 문장을 외우고 인출하는 과정이 좌뇌 언어 중추를 자극합니다.</li>
-<li><strong>집중력 향상</strong> — 암송에 필요한 깊은 집중이 전두엽의 실행 기능을 강화합니다.</li>
-</ul>
-<h3>성경 암송과 두뇌 훈련의 시너지</h3>
-<p>JS 두뇌훈련의 문장기억 훈련은 성경 암송에 필요한 핵심 능력인 '순서 기억'과 '문맥 파악'을 집중적으로 훈련합니다. 훈련을 꾸준히 하면 성경 구절이 더 빨리, 더 오래 기억됩니다.</p>
-<p>또한 성경 확장팩을 통해 실제 성경 구절로 훈련하실 수 있습니다. 신앙과 두뇌 건강을 동시에 키워보세요.</p>
-<div class="article-source">출처: Journal of Religion and Health, Neuroscience & Biobehavioral Reviews</div>`
-  },
-  a7:{
-    tag:'안구 운동',
-    title:'독서 능력 향상을 위한 안구 운동법',
-    content:`
-<h3>눈도 훈련이 필요합니다</h3>
-<p>독서 속도의 핵심은 안구 운동에 있습니다. 우리 눈은 글을 읽을 때 부드럽게 움직이는 것이 아니라 '도약 운동(Saccade)'이라는 짧고 빠른 점프를 반복합니다. 이 운동을 훈련하면 독서 속도가 2배 이상 빨라질 수 있습니다.</p>
-<h3>안구 운동의 종류와 효과</h3>
-<ul>
-<li><strong>수평 추적 운동</strong> — 좌우로 이동하는 물체를 따라가는 훈련으로 가로 독서 속도를 높입니다.</li>
-<li><strong>수직 추적 운동</strong> — 상하로 이동하는 물체를 따라가는 훈련으로 줄 바꿈 속도를 향상시킵니다.</li>
-<li><strong>교차 운동</strong> — 다양한 방향으로 눈을 빠르게 이동하는 훈련으로 전체적인 안구 근력을 강화합니다.</li>
-</ul>
-<h3>JS 두뇌훈련 시력강화 훈련 활용법</h3>
-<p>시력강화 훈련의 3가지 모드(가로/세로/랜덤)를 순서대로 훈련하세요. 수준을 높여갈수록 안구 운동 범위가 확장되고, 더 빠른 반응 속도를 요구합니다. 하루 5~10분씩 꾸준히 하면 2~3주 후에 독서 속도 향상을 느끼실 수 있습니다.</p>
-<div class="article-source">출처: 한국안과학회, Vision Research Journal</div>`
-  },
-  a8:{
-    tag:'뇌 과소성',
-    title:'나이 들어도 기억력 회복이 가능한 이유',
-    content:`
-<h3>뇌는 평생 변합니다</h3>
-<p>'뇌 가소성(Brain Plasticity)'이란 경험과 훈련에 따라 뇌가 구조적·기능적으로 변화하는 능력입니다. 과거에는 뇌세포가 한 번 죽으면 재생되지 않는다고 믿었지만, 현대 신경과학은 이를 완전히 뒤집었습니다.</p>
-<h3>놀라운 연구 결과</h3>
-<ul>
-<li>70대에도 해마에서 새로운 신경세포(뉴런)가 생성됩니다. (스탠퍼드 대학 연구, 2019)</li>
-<li>인지 훈련을 받은 70~80대 노인은 10년 후에도 인지 기능이 향상된 상태를 유지했습니다.</li>
-<li>제2 언어를 배우는 노인은 동일 연령 대비 치매 발생이 평균 4~5년 늦게 나타납니다.</li>
-</ul>
-<h3>기억력 회복을 위한 실천법</h3>
-<ul>
-<li><strong>새로운 것 배우기</strong> — 새로운 학습은 뇌에 새로운 신경 연결을 만듭니다.</li>
-<li><strong>체계적인 인지 훈련</strong> — 단순 암기보다 추론·판단·기억을 복합적으로 사용하는 훈련이 더 효과적입니다.</li>
-<li><strong>사회적 참여</strong> — 대화와 교류는 뇌의 여러 영역을 동시에 자극합니다.</li>
-<li><strong>신체 활동</strong> — 규칙적인 운동은 뇌 혈류를 증가시키고 BDNF를 분비시켜 뇌세포 성장을 돕습니다.</li>
-</ul>
-<div class="article-source">출처: Stanford University Neuroscience, New England Journal of Medicine</div>`
-  },
-  a9:{
-    tag:'디지털 건강',
-    title:'스마트폰이 집중력을 파괴하는 이유',
-    content:`
-<h3>스마트폰 중독, 뇌를 바꾸고 있습니다</h3>
-<p>한국인 하루 평균 스마트폰 사용 시간은 5시간을 넘어섰습니다. 스마트폰은 편리하지만 우리의 집중력을 심각하게 훼손하고 있습니다.</p>
-<h3>스마트폰이 집중력을 파괴하는 3가지 메커니즘</h3>
-<ul>
-<li><strong>도파민 과잉 자극</strong> — SNS 알림, 좋아요, 새 메시지는 도파민을 분비시킵니다. 이 자극이 반복되면 뇌는 '즉각적인 보상'에 익숙해져 오래 기다리는 능력(집중력)을 잃어갑니다.</li>
-<li><strong>집중 방해</strong> — 마이크로소프트 연구에 따르면 스마트폰 알림으로 집중이 깨지면 다시 집중하는 데 평균 23분이 필요합니다. 하루 수십 번의 알림은 생산적인 시간을 모두 앗아갑니다.</li>
-<li><strong>멀티태스킹 착각</strong> — 스마트폰을 보면서 다른 일을 하는 것은 멀티태스킹이 아니라 '주의 전환'입니다. 이 과정에서 오류율이 높아지고 집중력이 소모됩니다.</li>
-</ul>
-<h3>디지털 디톡스 실천법</h3>
-<ul>
-<li>훈련 중에는 스마트폰을 다른 방에 두거나 비행기 모드로 전환하세요.</li>
-<li>하루 1시간 '스마트폰 없는 시간'을 정해보세요.</li>
-<li>잠자리에 들기 1시간 전에는 스마트폰을 내려놓으세요.</li>
-</ul>
-<div class="article-source">출처: Microsoft Research, Journal of Experimental Psychology</div>`
-  },
-  a10:{
-    tag:'낱말 훈련',
-    title:'하루 10분 낱말 훈련의 놀라운 두뇌 효과',
-    content:`
-<h3>낱말 하나가 뇌 전체를 깨웁니다</h3>
-<p>낱말 훈련은 단순해 보이지만 뇌의 여러 영역을 동시에 활성화합니다. 글자를 인식하는 시각 피질, 의미를 처리하는 언어 중추, 기억을 저장하는 해마가 함께 작동합니다.</p>
-<h3>낱말 훈련이 두뇌에 미치는 효과</h3>
-<ul>
-<li><strong>시각 처리 속도 향상</strong> — 순간적으로 나타나는 낱말을 인식하는 훈련이 시각 정보 처리 속도를 높입니다.</li>
-<li><strong>어휘력 확장</strong> — 다양한 낱말에 반복 노출되면서 자연스럽게 어휘력이 향상됩니다.</li>
-<li><strong>반응 속도 개선</strong> — 빠른 자극에 반응하는 훈련이 신경 반응 속도를 개선합니다.</li>
-<li><strong>작업 기억 강화</strong> — 여러 낱말을 동시에 처리하는 훈련이 작업 기억(Working Memory)을 강화합니다.</li>
-</ul>
-<h3>10분 낱말 훈련 루틴</h3>
-<ul>
-<li>집중력 훈련 5분 — 낱말 순간 포착 훈련</li>
-<li>기억력 훈련 5분 — 낱말 위치 기억 훈련</li>
-</ul>
-<p>이 짧은 10분 훈련을 매일 반복하면 놀라운 효과를 경험하실 수 있습니다. 꾸준함이 핵심입니다.</p>
-<div class="article-source">출처: 한국인지과학회, Cognitive Psychology Journal</div>`
-  }
+  a1:{tag:'치매 예방',title:'치매 예방을 위한 두뇌 훈련 7가지',content:`<h3>두뇌 훈련이 치매를 예방하는 이유</h3><p>65세 이상 노인 10명 중 1명이 치매를 앓고 있습니다. 하지만 꾸준한 두뇌 훈련으로 치매 발생 위험을 최대 35% 낮출 수 있다는 연구 결과가 있습니다.</p><h3>과학적으로 검증된 7가지 두뇌 훈련</h3><ul><li><strong>집중력 훈련</strong> — 주의 집중 시간을 늘리고 정보 처리 속도를 향상시킵니다.</li><li><strong>기억력 훈련</strong> — 단기 기억과 장기 기억을 연결하는 해마 기능을 강화합니다.</li><li><strong>언어 훈련</strong> — 어휘력 향상과 언어 중추 활성화로 인지 예비력을 높입니다.</li><li><strong>시각 훈련</strong> — 공간 인식과 시각 처리 속도를 개선합니다.</li><li><strong>문제 해결 훈련</strong> — 전두엽의 실행 기능을 강화합니다.</li><li><strong>독서 훈련</strong> — 다양한 뇌 영역을 동시에 활성화합니다.</li><li><strong>신체 활동</strong> — 뇌 혈류를 증가시키고 신경 성장 인자를 분비시킵니다.</li></ul><div class="article-source">출처: 서울대학교병원 노인건강연구소, 한국치매협회</div>`},
+  a2:{tag:'노화와 기억력',title:'60대 이후 기억력 저하, 원인과 해결책',content:`<h3>왜 나이가 들면 기억력이 떨어질까요?</h3><p>뇌세포 감소, 신경전달물질 변화, 혈류 감소 등 다양한 원인이 있습니다. 하지만 뇌는 훈련으로 변화할 수 있습니다.</p><h3>효과적인 해결책</h3><ul><li><strong>꾸준한 인지 훈련</strong> — 매일 30분의 두뇌 훈련이 기억력 회복에 효과적입니다.</li><li><strong>충분한 수면</strong> — 수면 중 기억이 장기 기억으로 저장됩니다.</li><li><strong>규칙적인 운동</strong> — 유산소 운동이 해마 크기를 증가시킵니다.</li></ul><div class="article-source">출처: 한국뇌연구원, Alzheimer's Association</div>`},
+  a3:{tag:'속독 원리',title:'속독의 원리 — 눈이 아닌 뇌로 읽는 법',content:`<h3>속독이란 무엇인가?</h3><p>일반인의 독서 속도는 분당 200~300자 수준입니다. 속독 훈련으로 분당 600자 이상 읽으면서도 이해도를 높일 수 있습니다.</p><h3>핵심 원리</h3><ul><li><strong>안구 운동 훈련</strong> — 도약 운동(Saccade)을 훈련하여 한 번에 더 많은 텍스트를 인식합니다.</li><li><strong>묵독 제거</strong> — 마음속으로 읽는 습관을 제거하면 속도가 2배 이상 빨라집니다.</li><li><strong>주변 시야 활용</strong> — 시야를 넓혀 한 줄을 2~3개의 덩어리로 파악합니다.</li></ul><div class="article-source">출처: 한국안과학회, Vision Research Journal</div>`},
+  a4:{tag:'집중력',title:'집중력이 3배 좋아지는 생활 습관 5가지',content:`<h3>집중력도 훈련이 가능합니다</h3><p>집중력은 타고나는 것이 아닙니다. 올바른 생활 습관과 꾸준한 훈련으로 누구나 향상시킬 수 있습니다.</p><h3>5가지 핵심 습관</h3><ul><li><strong>수면 최적화</strong> — 7~8시간의 규칙적인 수면이 전두엽 기능을 회복시킵니다.</li><li><strong>디지털 디톡스</strong> — 훈련 중 스마트폰을 다른 방에 두세요.</li><li><strong>단일 과제 집중</strong> — 멀티태스킹은 집중력을 소모시킵니다.</li><li><strong>포모도로 기법</strong> — 25분 집중, 5분 휴식 사이클을 활용하세요.</li><li><strong>두뇌 훈련</strong> — 매일 집중력 훈련으로 신경 회로를 강화합니다.</li></ul><div class="article-source">출처: 하버드 의대, Microsoft Research</div>`},
+  a5:{tag:'시니어 건강',title:'시니어를 위한 하루 30분 두뇌 운동법',content:`<h3>시니어에게 최적화된 훈련 루틴</h3><p>하루 30분, 5가지 훈련을 순서대로 진행하면 최대의 효과를 얻을 수 있습니다.</p><ul><li><strong>시력강화 (5분)</strong> — 안구 운동으로 준비 운동을 합니다.</li><li><strong>집중력 훈련 (10분)</strong> — 낱말 집중력 훈련으로 순간 인식력을 키웁니다.</li><li><strong>기억력 훈련 (10분)</strong> — 단기 기억을 강화합니다.</li><li><strong>독해 훈련 (5분)</strong> — 독서능력 향상 훈련으로 마무리합니다.</li></ul><div class="article-source">출처: 서울대학교병원 노인건강연구소, 한국치매협회</div>`},
+  a6:{tag:'성경과 두뇌',title:'성경 암송이 뇌 건강에 미치는 놀라운 영향',content:`<h3>암송, 최고의 두뇌 훈련</h3><p>성경을 암송하는 행위는 단순한 신앙 활동을 넘어 뇌 건강에도 탁월한 효과가 있습니다. 신경과학 연구들은 규칙적인 암송이 해마 기능을 강화하고 알츠하이머 발병을 늦출 수 있음을 보여줍니다.</p><h3>암송의 3가지 두뇌 효과</h3><ul><li><strong>해마 강화</strong> — 반복 학습이 해마의 신경 연결을 강화합니다.</li><li><strong>언어 중추 활성화</strong> — 의미 있는 문장을 외우는 과정이 좌뇌 언어 중추를 자극합니다.</li><li><strong>집중력 향상</strong> — 암송에 필요한 깊은 집중이 전두엽을 강화합니다.</li></ul><div class="article-source">출처: Journal of Religion and Health, Neuroscience & Biobehavioral Reviews</div>`}
 };
 
-function openArticle(id){
-  const a=articles[id];
-  if(!a)return;
-  document.getElementById('articleContent').innerHTML=
+function openArticle(id) {
+  const a = articles[id];
+  if(!a) return;
+  document.getElementById('articleContent').innerHTML =
     '<span class="article-tag">'+a.tag+'</span><h2>'+a.title+'</h2><div class="article-content">'+a.content+'</div>';
-  const ov=document.getElementById('overlay');
+  const ov = document.getElementById('overlay');
   ov.classList.add('open');
-  ov.scrollTop=0;
-  // iOS body 스크롤 잠금
-  document.body.style.cssText='overflow:hidden;position:fixed;width:100%;top:-'+window.scrollY+'px';
+  ov.scrollTop = 0;
+  document.body.style.cssText = 'overflow:hidden;position:fixed;width:100%;top:-'+window.scrollY+'px';
 }
-function closeArticle(){
-  const ov=document.getElementById('overlay');
+function closeArticle() {
+  const ov = document.getElementById('overlay');
   ov.classList.remove('open');
-  // iOS body 스크롤 복원
-  const top=document.body.style.top;
-  document.body.style.cssText='';
-  window.scrollTo(0,-(parseInt(top||'0')));
+  const top = document.body.style.top;
+  document.body.style.cssText = '';
+  window.scrollTo(0, -(parseInt(top||'0')));
 }
-document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeArticle(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeArticle(); });
 </script>
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('/kor/sw.js')
-      .then(function(reg){ console.log('SW registered'); })
-      .catch(function(err){ console.log('SW error:', err); });
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW error:',e));
   });
 }
 </script>
