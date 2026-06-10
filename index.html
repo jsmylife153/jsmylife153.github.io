@@ -100,7 +100,15 @@
         const adminBtn = window._isAdmin
           ? `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
                <button class="btn-reply-toggle" onclick="toggleReplyForm('${docSnap.id}')">💬 답변 ${d.adminReply ? "수정":"작성"}</button>
+               <button class="btn-reply-toggle" style="border-color:#3498db;color:#3498db" onclick="toggleEditForm('${docSnap.id}')">✏️ 수정</button>
                <button class="btn-delete" onclick="deletePost('${docSnap.id}')">🗑 삭제</button>
+             </div>
+             <div class="reply-form" id="edit-${docSnap.id}">
+               <textarea class="reply-textarea" id="edit-text-${docSnap.id}" placeholder="내용을 수정하세요">${escHtml(d.content||"")}</textarea>
+               <div style="display:flex;gap:8px;align-items:center">
+                 <button class="btn-reply-submit" style="background:#3498db" onclick="submitEdit('${docSnap.id}')">수정 완료</button>
+                 <button class="btn-reply-toggle" onclick="toggleEditForm('${docSnap.id}')">취소</button>
+               </div>
              </div>
              <div class="reply-form" id="reply-${docSnap.id}">
                <textarea class="reply-textarea" id="reply-text-${docSnap.id}" placeholder="관리자 답변을 입력하세요">${d.adminReply||""}</textarea>
@@ -160,6 +168,18 @@
       });
       return true;
     } catch(e){ console.error("submitReply error",e); return false; }
+  };
+
+  // 글 내용 수정 (관리자 전용)
+  window._editPost = async function(postId, newContent) {
+    if(!newContent.trim()) return false;
+    try {
+      await updateDoc(doc(db, "board", postId), {
+        content: newContent.trim().slice(0, 500),
+        editedAt: serverTimestamp()
+      });
+      return true;
+    } catch(e){ console.error("editPost error",e); return false; }
   };
 
   // 글 삭제 (관리자 전용)
@@ -382,9 +402,6 @@ nav a:hover{color:var(--green)}
 .btn-delete:hover{background:#e74c3c;color:#fff}
 
 /* 관리자 패널 */
-.admin-bar{background:#1a1a2e;padding:6px 5%;display:flex;justify-content:flex-end;align-items:center;gap:10px}
-.admin-login-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);font-size:.78rem;padding:4px 14px;border-radius:16px;cursor:pointer;font-family:inherit}
-.admin-login-btn:hover{background:rgba(255,255,255,.2)}
 .admin-status{font-size:.75rem;color:#4aab6d;font-weight:700}
 
 /* ── CTA BANNER ── */
@@ -435,12 +452,6 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 </head>
 <body>
 
-<!-- 관리자 바 -->
-<div class="admin-bar">
-  <span class="admin-status" id="admin-status" style="display:none">🔑 관리자 모드</span>
-  <button class="admin-login-btn" id="admin-toggle-btn" onclick="toggleAdminLogin()">관리자</button>
-</div>
-
 <!-- 언어 선택 바 -->
 <div class="lang-bar">
   <button class="lang-btn active" onclick="setLang('kor')" id="btn-kor">🇰🇷 한국어</button>
@@ -454,7 +465,7 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
     <div class="logo">🧠 <span>JS</span> <span data-i18n="site_name">두뇌훈련</span></div>
     <nav>
       <a href="#training" data-i18n="nav_training">훈련 소개</a>
-      <a href="#languages" data-i18n="nav_lang">언어 선택</a>
+      <a href="#languages" data-i18n="nav_lang">훈련 언어</a>
       <a href="#blog" data-i18n="nav_blog">두뇌 건강 정보</a>
       <a href="#board" data-i18n="nav_board">게시판</a>
       <a href="/kor/app.html" class="btn-start" data-i18n="nav_start">▶ 훈련 시작</a>
@@ -597,68 +608,7 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
       <p data-i18n="blog_p">치매 예방부터 기억력 향상까지, 전문가가 검증한 두뇌 건강 정보를 제공합니다</p>
     </div>
 
-    <div class="blog-grid">
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#e8f5ec,#c8e6d0)">🧠</div>
-        <div class="blog-body">
-          <div class="blog-tag">치매 예방</div>
-          <h3>치매 예방을 위한 두뇌 훈련 7가지</h3>
-          <p>65세 이상 노인 10명 중 1명이 치매를 앓고 있습니다. 꾸준한 두뇌 훈련으로 치매 발생 위험을 최대 35% 낮출 수 있다는 연구 결과가 있습니다...</p>
-          <button class="blog-read" onclick="openArticle('a1')">자세히 읽기</button>
-          <div class="blog-meta"><span>📅 두뇌 건강</span><span>⏱ 4분 읽기</span></div>
-        </div>
-      </div>
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#fff8e6,#ffe0a0)">👴</div>
-        <div class="blog-body">
-          <div class="blog-tag">노화와 기억력</div>
-          <h3>60대 이후 기억력 저하, 원인과 해결책</h3>
-          <p>나이가 들면 왜 기억력이 떨어질까요? 뇌세포 감소, 신경전달물질 변화, 혈류 감소 등 다양한 원인이 있습니다. 하지만 뇌는 훈련으로 변화할 수 있습니다...</p>
-          <button class="blog-read" onclick="openArticle('a2')">자세히 읽기</button>
-          <div class="blog-meta"><span>📅 기억력</span><span>⏱ 5분 읽기</span></div>
-        </div>
-      </div>
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#e8f0ff,#c0d4ff)">📚</div>
-        <div class="blog-body">
-          <div class="blog-tag">속독 원리</div>
-          <h3>속독의 원리 — 눈이 아닌 뇌로 읽는 법</h3>
-          <p>일반인의 독서 속도는 분당 200~300자 수준입니다. 속독 훈련을 통해 분당 600자 이상 읽으면서도 이해도를 높이는 방법이 있습니다...</p>
-          <button class="blog-read" onclick="openArticle('a3')">자세히 읽기</button>
-          <div class="blog-meta"><span>📅 독서 능력</span><span>⏱ 4분 읽기</span></div>
-        </div>
-      </div>
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#fce8f0,#f5b8d0)">⚡</div>
-        <div class="blog-body">
-          <div class="blog-tag">집중력</div>
-          <h3>집중력이 3배 좋아지는 생활 습관 5가지</h3>
-          <p>집중력은 타고나는 것이 아닙니다. 올바른 생활 습관과 꾸준한 훈련으로 누구나 집중력을 향상시킬 수 있습니다. 하버드 의대 연구팀이 밝힌 습관...</p>
-          <button class="blog-read" onclick="openArticle('a4')">자세히 읽기</button>
-          <div class="blog-meta"><span>📅 집중력</span><span>⏱ 4분 읽기</span></div>
-        </div>
-      </div>
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#e8faf0,#a8e6c8)">🌅</div>
-        <div class="blog-body">
-          <div class="blog-tag">시니어 건강</div>
-          <h3>시니어를 위한 하루 30분 두뇌 운동법</h3>
-          <p>운동이 몸을 건강하게 하듯, 두뇌도 꾸준한 운동이 필요합니다. 하루 30분만 투자하면 기억력, 집중력, 인지 기능이 크게 향상됩니다...</p>
-          <button class="blog-read" onclick="openArticle('a5')">자세히 읽기</button>
-          <div class="blog-meta"><span>📅 시니어 건강</span><span>⏱ 5분 읽기</span></div>
-        </div>
-      </div>
-      <div class="blog-card fade-up">
-        <div class="blog-thumb" style="background:linear-gradient(135deg,#f0e8ff,#d4b8f5)">✝️</div>
-        <div class="blog-body">
-          <div class="blog-tag">성경과 두뇌</div>
-          <h3>성경 암송이 뇌 건강에 미치는 놀라운 영향</h3>
-          <p>성경을 암송하는 행위는 단순한 신앙 활동을 넘어 뇌 건강에도 탁월한 효과가 있습니다. 신경과학 연구들은 규칙적인 암송이 해마 기능을 강화한다고 밝힙니다...</p>
-          <button class="blog-read" onclick="openArticle('a6')">자세히 읽기</button>
-          <div class="blog-meta"><span>📅 성경·두뇌</span><span>⏱ 4분 읽기</span></div>
-        </div>
-      </div>
-    </div>
+    <div class="blog-grid" id="blog-grid"></div>
   </div>
 </section>
 
@@ -809,6 +759,8 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
           <li><a href="/kor/privacy.html" data-i18n="footer_privacy">개인정보처리방침</a></li>
           <li><a href="/kor/terms.html" data-i18n="footer_terms">이용약관</a></li>
           <li><a href="#board" data-i18n="footer_board">게시판</a></li>
+          <li><a href="javascript:void(0)" onclick="toggleAdminLogin()" id="admin-toggle-btn" style="opacity:.75;transition:opacity .2s" data-i18n="footer_admin">관리자</a></li>
+          <li style="display:none" id="admin-status-li"><span class="admin-status">🔑 관리자 모드</span></li>
           <li><a href="mailto:jsmylife153@gmail.com" data-i18n="footer_contact">문의하기</a></li>
         </ul>
       </div>
@@ -829,11 +781,44 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 </div>
 
 <script>
+// ── 블로그 카드 렌더링
+function renderBlog(lang) {
+  const grid = document.getElementById("blog-grid");
+  if(!grid) return;
+  const cards = i18n[lang].blog_cards;
+  if(!cards) return;
+  grid.innerHTML = cards.map(c => `
+    <div class="blog-card fade-up">
+      <div class="blog-thumb" style="background:${c.bg}">${c.icon}</div>
+      <div class="blog-body">
+        <div class="blog-tag">${c.tag}</div>
+        <h3>${c.title}</h3>
+        <p>${c.desc}</p>
+        <button class="blog-read" onclick="openArticle('${c.id}')">${c.read}</button>
+        <div class="blog-meta"><span>${c.meta1}</span><span>${c.meta2}</span></div>
+      </div>
+    </div>`).join("");
+  // 스크롤 애니메이션 재적용
+  if('IntersectionObserver' in window){
+    grid.querySelectorAll('.fade-up').forEach(el => fadeObs.observe(el));
+  } else {
+    grid.querySelectorAll('.fade-up').forEach(el => el.classList.add('visible'));
+  }
+}
+
 // ── i18n 데이터
 const i18n = {
   kor: {
+    blog_cards:[
+      {bg:"linear-gradient(135deg,#e8f5ec,#c8e6d0)",icon:"🧠",tag:"치매 예방",title:"치매 예방을 위한 두뇌 훈련 7가지",desc:"65세 이상 노인 10명 중 1명이 치매를 앓고 있습니다. 꾸준한 두뇌 훈련으로 치매 발생 위험을 최대 35% 낮출 수 있다는 연구 결과가 있습니다...",read:"자세히 읽기",meta1:"📅 두뇌 건강",meta2:"⏱ 4분 읽기",id:"a1"},
+      {bg:"linear-gradient(135deg,#fff8e6,#ffe0a0)",icon:"👴",tag:"노화와 기억력",title:"60대 이후 기억력 저하, 원인과 해결책",desc:"나이가 들면 왜 기억력이 떨어질까요? 뇌세포 감소, 신경전달물질 변화, 혈류 감소 등 다양한 원인이 있습니다. 하지만 뇌는 훈련으로 변화할 수 있습니다...",read:"자세히 읽기",meta1:"📅 기억력",meta2:"⏱ 5분 읽기",id:"a2"},
+      {bg:"linear-gradient(135deg,#e8f0ff,#c0d4ff)",icon:"📚",tag:"속독 원리",title:"속독의 원리 — 눈이 아닌 뇌로 읽는 법",desc:"일반인의 독서 속도는 분당 200~300자 수준입니다. 속독 훈련을 통해 분당 600자 이상 읽으면서도 이해도를 높이는 방법이 있습니다...",read:"자세히 읽기",meta1:"📅 독서 능력",meta2:"⏱ 4분 읽기",id:"a3"},
+      {bg:"linear-gradient(135deg,#fce8f0,#f5b8d0)",icon:"⚡",tag:"집중력",title:"집중력이 3배 좋아지는 생활 습관 5가지",desc:"집중력은 타고나는 것이 아닙니다. 올바른 생활 습관과 꾸준한 훈련으로 누구나 집중력을 향상시킬 수 있습니다. 하버드 의대 연구팀이 밝힌 습관...",read:"자세히 읽기",meta1:"📅 집중력",meta2:"⏱ 4분 읽기",id:"a4"},
+      {bg:"linear-gradient(135deg,#e8faf0,#a8e6c8)",icon:"🌅",tag:"시니어 건강",title:"시니어를 위한 하루 30분 두뇌 운동법",desc:"운동이 몸을 건강하게 하듯, 두뇌도 꾸준한 운동이 필요합니다. 하루 30분만 투자하면 기억력, 집중력, 인지 기능이 크게 향상됩니다...",read:"자세히 읽기",meta1:"📅 시니어 건강",meta2:"⏱ 5분 읽기",id:"a5"},
+      {bg:"linear-gradient(135deg,#f0e8ff,#d4b8f5)",icon:"✝️",tag:"성경과 두뇌",title:"성경 암송이 뇌 건강에 미치는 놀라운 영향",desc:"성경을 암송하는 행위는 단순한 신앙 활동을 넘어 뇌 건강에도 탁월한 효과가 있습니다. 신경과학 연구들은 규칙적인 암송이 해마 기능을 강화한다고 밝힙니다...",read:"자세히 읽기",meta1:"📅 성경·두뇌",meta2:"⏱ 4분 읽기",id:"a6"}
+    ],
     tag1:"🧠 치매 예방", tag2:"📚 속독 훈련", tag3:"💡 집중력 향상", tag4:"🎯 기억력 강화", tag5:"👁️ 시력 강화",
-    site_name:"두뇌훈련", nav_training:"훈련 소개", nav_lang:"언어 선택", nav_blog:"두뇌 건강 정보",
+    site_name:"두뇌훈련", nav_training:"훈련 소개", nav_lang:"훈련 언어", nav_blog:"두뇌 건강 정보",
     nav_board:"게시판", nav_start:"▶ 훈련 시작",
     hero_badge:"✅ 완전 무료 · 앱 설치 불필요 · 시니어 특화",
     hero_h1:"두뇌가 젊어지는 <em>30분</em>,<br>매일 꾸준히",
@@ -873,12 +858,20 @@ const i18n = {
     board_ok:"등록되었습니다!", board_err:"등록에 실패했습니다. 다시 시도해주세요.",
     cta_h2:"오늘부터 시작하세요<br>두뇌는 훈련할수록 강해집니다", cta_p:"매일 30분, 꾸준한 두뇌 훈련으로 더 건강하고 활기찬 노후를 만들어 가세요", cta_btn:"▶ 지금 무료로 시작하기",
     footer_training:"훈련 프로그램", footer_intro:"5가지 훈련 소개", footer_info:"정보",
-    footer_privacy:"개인정보처리방침", footer_terms:"이용약관", footer_board:"게시판", footer_contact:"문의하기",
+    footer_privacy:"개인정보처리방침", footer_terms:"이용약관", footer_board:"게시판", footer_admin:"관리자", footer_contact:"문의하기",
     footer_disclaimer:"본 사이트는 의료적 진단이나 치료를 목적으로 하지 않습니다."
   },
   jpn: {
+    blog_cards:[
+      {bg:"linear-gradient(135deg,#e8f5ec,#c8e6d0)",icon:"🧠",tag:"認知症予防",title:"認知症予防のための脳トレ7選",desc:"65歳以上の高齢者の10人に1人が認知症を患っています。継続的な脳トレで認知症発症リスクを最大35%低下できるという研究結果があります...",read:"詳しく読む",meta1:"📅 脳の健康",meta2:"⏱ 4分で読める",id:"a1"},
+      {bg:"linear-gradient(135deg,#fff8e6,#ffe0a0)",icon:"👴",tag:"老化と記憶力",title:"60代以降の記憶力低下、原因と解決策",desc:"なぜ年齢を重ねると記憶力が落ちるのでしょうか？脳細胞の減少、神経伝達物質の変化、血流の低下など様々な原因があります。でも脳はトレーニングで変わります...",read:"詳しく読む",meta1:"📅 記憶力",meta2:"⏱ 5分で読める",id:"a2"},
+      {bg:"linear-gradient(135deg,#e8f0ff,#c0d4ff)",icon:"📚",tag:"速読の原理",title:"速読の原理 — 目ではなく脳で読む方法",desc:"一般的な読書速度は1分間に400～600文字程度です。速読トレーニングで1分間に1200文字以上読みながら理解度を高める方法があります...",read:"詳しく読む",meta1:"📅 読書能力",meta2:"⏱ 4分で読める",id:"a3"},
+      {bg:"linear-gradient(135deg,#fce8f0,#f5b8d0)",icon:"⚡",tag:"集中力",title:"集中力が3倍になる生活習慣5つ",desc:"集中力は生まれつきのものではありません。正しい生活習慣と継続的なトレーニングで誰でも向上できます。ハーバード医大研究チームが明かした習慣...",read:"詳しく読む",meta1:"📅 集中力",meta2:"⏱ 4分で読める",id:"a4"},
+      {bg:"linear-gradient(135deg,#e8faf0,#a8e6c8)",icon:"🌅",tag:"シニアの健康",title:"シニアのための1日30分脳トレ法",desc:"運動が体を健康にするように、脳も継続的なトレーニングが必要です。1日30分投資するだけで記憶力、集中力、認知機能が大きく向上します...",read:"詳しく読む",meta1:"📅 シニアの健康",meta2:"⏱ 5分で読める",id:"a5"},
+      {bg:"linear-gradient(135deg,#f0e8ff,#d4b8f5)",icon:"✝️",tag:"聖書と脳",title:"聖書の暗唱が脳の健康に与える驚くべき影響",desc:"聖書を暗唱する行為は単なる信仰活動を超えて、脳の健康にも優れた効果があります。神経科学の研究は定期的な暗唱が海馬機能を強化すると明かしています...",read:"詳しく読む",meta1:"📅 聖書・脳",meta2:"⏱ 4分で読める",id:"a6"}
+    ],
     tag1:"🧠 認知症予防", tag2:"📚 速読訓練", tag3:"💡 集中力向上", tag4:"🎯 記憶力強化", tag5:"👁️ 視力強化",
-    site_name:"脳トレーニング", nav_training:"トレーニング紹介", nav_lang:"言語選択", nav_blog:"脳健康情報",
+    site_name:"脳トレーニング", nav_training:"トレーニング紹介", nav_lang:"トレーニング言語", nav_blog:"脳健康情報",
     nav_board:"掲示板", nav_start:"▶ トレーニング開始",
     hero_badge:"✅ 完全無料 · アプリ不要 · シニア特化",
     hero_h1:"脳が若返る<em>30分</em>、<br>毎日続けよう",
@@ -918,12 +911,20 @@ const i18n = {
     board_ok:"投稿されました！", board_err:"投稿に失敗しました。もう一度お試しください。",
     cta_h2:"今日から始めましょう<br>脳はトレーニングするほど強くなります", cta_p:"毎日30分、継続的な脳トレでより健康で活気ある老後を作りましょう", cta_btn:"▶ 今すぐ無料で始める",
     footer_training:"トレーニング", footer_intro:"5つのトレーニング紹介", footer_info:"情報",
-    footer_privacy:"プライバシーポリシー", footer_terms:"利用規約", footer_board:"掲示板", footer_contact:"お問い合わせ",
+    footer_privacy:"プライバシーポリシー", footer_terms:"利用規約", footer_board:"掲示板", footer_admin:"管理者", footer_contact:"お問い合わせ",
     footer_disclaimer:"本サイトは医療診断や治療を目的としていません。"
   },
   esp: {
+    blog_cards:[
+      {bg:"linear-gradient(135deg,#e8f5ec,#c8e6d0)",icon:"🧠",tag:"Prevención del Alzheimer",title:"7 ejercicios cerebrales para prevenir el Alzheimer",desc:"1 de cada 10 personas mayores de 65 años padece demencia. Estudios demuestran que el entrenamiento cerebral constante puede reducir el riesgo hasta un 35%...",read:"Leer más",meta1:"📅 Salud cerebral",meta2:"⏱ 4 min lectura",id:"a1"},
+      {bg:"linear-gradient(135deg,#fff8e6,#ffe0a0)",icon:"👴",tag:"Envejecimiento y memoria",title:"Pérdida de memoria después de los 60: causas y soluciones",desc:"¿Por qué disminuye la memoria con la edad? La reducción de neuronas, cambios en neurotransmisores y disminución del flujo sanguíneo son causas principales. Pero el cerebro puede cambiar...",read:"Leer más",meta1:"📅 Memoria",meta2:"⏱ 5 min lectura",id:"a2"},
+      {bg:"linear-gradient(135deg,#e8f0ff,#c0d4ff)",icon:"📚",tag:"Lectura rápida",title:"El principio de la lectura rápida — leer con el cerebro",desc:"La velocidad lectora promedio es de 200-300 palabras por minuto. Con entrenamiento de lectura rápida puedes superar las 600 palabras manteniendo la comprensión...",read:"Leer más",meta1:"📅 Habilidad lectora",meta2:"⏱ 4 min lectura",id:"a3"},
+      {bg:"linear-gradient(135deg,#fce8f0,#f5b8d0)",icon:"⚡",tag:"Concentración",title:"5 hábitos que triplican tu concentración",desc:"La concentración no es innata. Con hábitos correctos y entrenamiento constante cualquiera puede mejorarla. Los hábitos revelados por el equipo de Harvard...",read:"Leer más",meta1:"📅 Concentración",meta2:"⏱ 4 min lectura",id:"a4"},
+      {bg:"linear-gradient(135deg,#e8faf0,#a8e6c8)",icon:"🌅",tag:"Salud del mayor",title:"Rutina de 30 minutos de ejercicio cerebral para mayores",desc:"Así como el ejercicio mantiene el cuerpo sano, el cerebro también necesita entrenamiento constante. Solo 30 minutos al día mejoran notablemente memoria, concentración y cognición...",read:"Leer más",meta1:"📅 Salud del mayor",meta2:"⏱ 5 min lectura",id:"a5"},
+      {bg:"linear-gradient(135deg,#f0e8ff,#d4b8f5)",icon:"✝️",tag:"Biblia y cerebro",title:"El sorprendente impacto de memorizar la Biblia en la salud cerebral",desc:"Memorizar la Biblia va más allá de la fe: tiene efectos extraordinarios en la salud cerebral. Estudios de neurociencia revelan que la memorización regular fortalece el hipocampo...",read:"Leer más",meta1:"📅 Biblia · Cerebro",meta2:"⏱ 4 min lectura",id:"a6"}
+    ],
     tag1:"🧠 Prevenir Alzheimer", tag2:"📚 Lectura Rápida", tag3:"💡 Concentración", tag4:"🎯 Memoria", tag5:"👁️ Visión",
-    site_name:"Entrenamiento Cerebral", nav_training:"Entrenamientos", nav_lang:"Idioma", nav_blog:"Salud Cerebral",
+    site_name:"Entrenamiento Cerebral", nav_training:"Entrenamientos", nav_lang:"Idioma de Entrenamiento", nav_blog:"Salud Cerebral",
     nav_board:"Foro", nav_start:"▶ Comenzar",
     hero_badge:"✅ Completamente Gratis · Sin App · Para Mayores",
     hero_h1:"Rejuvenece tu cerebro<br>en <em>30 minutos</em> diarios",
@@ -963,7 +964,7 @@ const i18n = {
     board_ok:"¡Publicado con éxito!", board_err:"Error al publicar. Por favor, inténtalo de nuevo.",
     cta_h2:"Empieza hoy mismo<br>Tu cerebro se fortalece con el entrenamiento", cta_p:"30 minutos al día para una vejez más saludable y activa", cta_btn:"▶ Comenzar gratis ahora",
     footer_training:"Entrenamientos", footer_intro:"Introducción a los 5 entrenamientos", footer_info:"Información",
-    footer_privacy:"Política de privacidad", footer_terms:"Términos de uso", footer_board:"Foro", footer_contact:"Contacto",
+    footer_privacy:"Política de privacidad", footer_terms:"Términos de uso", footer_board:"Foro", footer_admin:"Administrador", footer_contact:"Contacto",
     footer_disclaimer:"Este sitio no tiene fines de diagnóstico ni tratamiento médico."
   }
 };
@@ -1000,6 +1001,8 @@ function setLang(lang) {
   if(sel) sel.value = lang;
   // 게시판 재로드
   if(window._loadPosts) window._loadPosts();
+  // 블로그 카드 재렌더링
+  renderBlog(lang);
 }
 
 async function deletePost(postId) {
@@ -1020,15 +1023,36 @@ async function deleteNotice(noticeId) {
 }
 window.deleteNotice = deleteNotice;
 
+function toggleEditForm(postId) {
+  const form = document.getElementById("edit-"+postId);
+  if(form) form.classList.toggle("open");
+  // 답변 폼은 닫기
+  const replyForm = document.getElementById("reply-"+postId);
+  if(replyForm) replyForm.classList.remove("open");
+}
+window.toggleEditForm = toggleEditForm;
+
+async function submitEdit(postId) {
+  if(!window._isAdmin) return;
+  const text = document.getElementById("edit-text-"+postId)?.value || "";
+  if(!text.trim()) { alert("내용을 입력하세요."); return; }
+  const ok = await window._editPost(postId, text);
+  if(ok) {
+    if(window._loadPosts) window._loadPosts();
+  } else {
+    alert("수정에 실패했습니다.");
+  }
+}
+window.submitEdit = submitEdit;
+
 // ── 관리자 기능
 const ADMIN_PW = "js2026admin"; // 필요시 변경
 
 function toggleAdminLogin() {
   if(window._isAdmin) {
-    // 로그아웃
     window._isAdmin = false;
-    document.getElementById("admin-status").style.display = "none";
-    document.getElementById("admin-toggle-btn").textContent = "관리자";
+    document.getElementById("admin-status-li").style.display = "none";
+    document.getElementById("admin-toggle-btn").textContent = i18n[currentLang].footer_admin || "관리자";
     document.getElementById("notice-write-area").style.display = "none";
     if(window._loadPosts) window._loadPosts();
     return;
@@ -1036,7 +1060,7 @@ function toggleAdminLogin() {
   const pw = prompt("관리자 비밀번호를 입력하세요:");
   if(pw === ADMIN_PW) {
     window._isAdmin = true;
-    document.getElementById("admin-status").style.display = "inline";
+    document.getElementById("admin-status-li").style.display = "list-item";
     document.getElementById("admin-toggle-btn").textContent = "로그아웃";
     document.getElementById("notice-write-area").style.display = "block";
     if(window._loadPosts) window._loadPosts();
@@ -1112,16 +1136,19 @@ async function submitPost() {
 }
 
 // ── 스크롤 애니메이션
+let fadeObs;
 if('IntersectionObserver' in window){
-  const obs = new IntersectionObserver(entries => {
+  fadeObs = new IntersectionObserver(entries => {
     entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
   }, {threshold:0.12});
-  document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+  document.querySelectorAll('.fade-up').forEach(el => fadeObs.observe(el));
 } else {
   document.querySelectorAll('.fade-up').forEach(el => el.classList.add('visible'));
 }
 
-// ── FAQ 토글
+document.addEventListener('DOMContentLoaded', () => {
+  renderBlog('kor');
+});
 document.querySelectorAll('.faq-q').forEach(q => {
   q.addEventListener('click', () => {
     const item = q.parentElement;
