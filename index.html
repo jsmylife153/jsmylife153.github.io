@@ -23,56 +23,107 @@
 <!-- Firebase -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp }
+  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
-    apiKey: "AIzaSyDDE_fLiFaXtQobP8g3IIrH2bKIz0eVkRk",
-    authDomain: "js-trainer-b0139.firebaseapp.com",
-    projectId: "js-trainer-b0139",
-    storageBucket: "js-trainer-b0139.firebasestorage.app",
-    messagingSenderId: "800427483325",
-    appId: "1:800427483325:web:5f8c8719ae561d163417d4"
+    apiKey: "AIzaSyBsbRuKEYZBU5oKNJwZMAK4XUhcq7yKd0Q",
+    authDomain: "js-trainer-kor.firebaseapp.com",
+    projectId: "js-trainer-kor",
+    storageBucket: "js-trainer-kor.firebasestorage.app",
+    messagingSenderId: "315054866321",
+    appId: "1:315054866321:web:11ad102d933fc66c042430"
   };
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   window._db = db;
   window._fbReady = true;
+  window._isAdmin = false;
 
-  // 게시판 글 로드
+  function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function langBadge(l){ return l==="jpn"?"🇯🇵 日本語":l==="esp"?"🇪🇸 Español":"🇰🇷 한국어"; }
+  function fmtDate(ts){ return ts ? new Date(ts.toDate()).toLocaleDateString("ko-KR") : ""; }
+
+  // 게시판 글 로드 (공지 먼저, 일반글 최신순)
   async function loadPosts() {
     try {
-      const q = query(collection(db, "board"), orderBy("createdAt", "desc"), limit(20));
-      const snap = await getDocs(q);
       const list = document.getElementById("post-list");
-      list.innerHTML = "";
-      if (snap.empty) {
+      list.innerHTML = '<div class="no-post">불러오는 중...</div>';
+
+      // 공지사항 로드
+      const noticeQ = query(collection(db, "notices"), orderBy("createdAt", "desc"));
+      const noticeSnap = await getDocs(noticeQ);
+
+      // 일반 글 로드
+      const postQ = query(collection(db, "board"), orderBy("createdAt", "desc"), limit(30));
+      const postSnap = await getDocs(postQ);
+
+      if(noticeSnap.empty && postSnap.empty){
         list.innerHTML = '<div class="no-post" data-i18n="board_empty">첫 번째 글을 남겨보세요!</div>';
         return;
       }
-      snap.forEach(doc => {
-        const d = doc.data();
+
+      list.innerHTML = "";
+
+      // 공지사항 렌더링
+      noticeSnap.forEach(docSnap => {
+        const d = docSnap.data();
+        const div = document.createElement("div");
+        div.className = "post-item notice";
+        const delBtn = window._isAdmin
+          ? `<button class="btn-delete" onclick="deleteNotice('${docSnap.id}')">🗑 삭제</button>` : "";
+        div.innerHTML = `
+          <div class="post-header">
+            <span class="notice-badge">📌 공지</span>
+            <span class="post-name">${escHtml(d.title||"공지사항")}</span>
+            <span class="post-date">${fmtDate(d.createdAt)}</span>
+            ${delBtn}
+          </div>
+          <div class="post-body">${escHtml(d.content)}</div>`;
+        list.appendChild(div);
+      });
+
+      // 일반 글 렌더링
+      postSnap.forEach(docSnap => {
+        const d = docSnap.data();
         const div = document.createElement("div");
         div.className = "post-item";
-        const date = d.createdAt ? new Date(d.createdAt.toDate()).toLocaleDateString("ko-KR") : "";
+        div.dataset.id = docSnap.id;
+
+        const replyHtml = d.adminReply
+          ? `<div class="admin-reply">
+              <div class="admin-reply-label">🔑 관리자 답변 · ${fmtDate(d.replyAt)}</div>
+              <div class="admin-reply-text">${escHtml(d.adminReply)}</div>
+             </div>` : "";
+
+        const adminBtn = window._isAdmin
+          ? `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+               <button class="btn-reply-toggle" onclick="toggleReplyForm('${docSnap.id}')">💬 답변 ${d.adminReply ? "수정":"작성"}</button>
+               <button class="btn-delete" onclick="deletePost('${docSnap.id}')">🗑 삭제</button>
+             </div>
+             <div class="reply-form" id="reply-${docSnap.id}">
+               <textarea class="reply-textarea" id="reply-text-${docSnap.id}" placeholder="관리자 답변을 입력하세요">${d.adminReply||""}</textarea>
+               <button class="btn-reply-submit" onclick="submitReply('${docSnap.id}')">답변 등록</button>
+             </div>` : "";
+
         div.innerHTML = `
           <div class="post-header">
             <span class="post-name">${escHtml(d.name||"익명")}</span>
             <span class="post-lang-badge">${langBadge(d.lang||"kor")}</span>
-            <span class="post-date">${date}</span>
+            <span class="post-date">${fmtDate(d.createdAt)}</span>
           </div>
-          <div class="post-body">${escHtml(d.content)}</div>`;
+          <div class="post-body">${escHtml(d.content)}</div>
+          ${replyHtml}
+          ${adminBtn}`;
         list.appendChild(div);
       });
     } catch(e) { console.error("loadPosts error",e); }
   }
 
-  function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-  function langBadge(l){ return l==="jpn"?"🇯🇵 日本語":l==="esp"?"🇪🇸 Español":"🇰🇷 한국어"; }
-
   window._loadPosts = loadPosts;
 
+  // 일반 글 등록
   window._submitPost = async function(name, content, lang) {
     if(!name.trim()||!content.trim()) return false;
     try {
@@ -86,9 +137,44 @@
     } catch(e){ console.error("submitPost error",e); return false; }
   };
 
-  document.addEventListener("DOMContentLoaded", () => {
-    loadPosts();
-  });
+  // 공지 등록
+  window._submitNotice = async function(title, content) {
+    if(!title.trim()||!content.trim()) return false;
+    try {
+      await addDoc(collection(db, "notices"), {
+        title: title.trim().slice(0,50),
+        content: content.trim().slice(0,1000),
+        createdAt: serverTimestamp()
+      });
+      return true;
+    } catch(e){ console.error("submitNotice error",e); return false; }
+  };
+
+  // 관리자 답변 등록
+  window._submitReply = async function(postId, replyText) {
+    if(!replyText.trim()) return false;
+    try {
+      await updateDoc(doc(db, "board", postId), {
+        adminReply: replyText.trim().slice(0,1000),
+        replyAt: serverTimestamp()
+      });
+      return true;
+    } catch(e){ console.error("submitReply error",e); return false; }
+  };
+
+  // 글 삭제 (관리자 전용)
+  window._deletePost = async function(postId) {
+    try {
+      await deleteDoc(doc(db, "board", postId));
+      return true;
+    } catch(e){ console.error("deletePost error",e); return false; }
+  };
+  window._deleteNotice = async function(noticeId) {
+    try { await deleteDoc(doc(db, "notices", noticeId)); return true; }
+    catch(e){ console.error("deleteNotice error",e); return false; }
+  };
+
+  document.addEventListener("DOMContentLoaded", () => { loadPosts(); });
 </script>
 
 <style>
@@ -275,6 +361,32 @@ nav a:hover{color:var(--green)}
 .post-body{font-size:.88rem;color:var(--text-mid);line-height:1.7;white-space:pre-wrap;word-break:break-word}
 .no-post{text-align:center;color:var(--text-soft);padding:32px;font-size:.9rem}
 
+/* 공지사항 */
+.post-item.notice{background:linear-gradient(135deg,#fffbea,#fff8e6);border:1.5px solid #f0c040;position:relative}
+.notice-badge{display:inline-block;background:#f0a500;color:#fff;font-size:.72rem;font-weight:700;padding:2px 10px;border-radius:10px;margin-right:6px}
+
+/* 관리자 답변 */
+.admin-reply{background:var(--green-light);border-left:3px solid var(--green);padding:12px 16px;margin-top:12px;border-radius:0 var(--r-sm) var(--r-sm) 0}
+.admin-reply-label{font-size:.75rem;font-weight:700;color:var(--green);margin-bottom:6px;display:flex;align-items:center;gap:4px}
+.admin-reply-text{font-size:.87rem;color:var(--text-mid);line-height:1.7;white-space:pre-wrap;word-break:break-word}
+
+/* 관리자 답변 폼 */
+.reply-form{margin-top:10px;display:none}
+.reply-form.open{display:block}
+.reply-textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-family:inherit;font-size:.88rem;resize:vertical;min-height:70px;margin-bottom:8px}
+.reply-textarea:focus{outline:none;border-color:var(--green)}
+.btn-reply-submit{background:var(--green-dark);color:#fff;padding:7px 20px;border-radius:20px;font-size:.85rem;font-weight:700;border:none;cursor:pointer;font-family:inherit}
+.btn-reply-toggle{background:none;border:1px solid var(--border);color:var(--text-soft);font-size:.75rem;padding:3px 10px;border-radius:10px;cursor:pointer;font-family:inherit;margin-top:6px}
+.btn-reply-toggle:hover{border-color:var(--green);color:var(--green)}
+.btn-delete{background:none;border:1px solid #e74c3c;color:#e74c3c;font-size:.75rem;padding:3px 10px;border-radius:10px;cursor:pointer;font-family:inherit;transition:all .2s}
+.btn-delete:hover{background:#e74c3c;color:#fff}
+
+/* 관리자 패널 */
+.admin-bar{background:#1a1a2e;padding:6px 5%;display:flex;justify-content:flex-end;align-items:center;gap:10px}
+.admin-login-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.7);font-size:.78rem;padding:4px 14px;border-radius:16px;cursor:pointer;font-family:inherit}
+.admin-login-btn:hover{background:rgba(255,255,255,.2)}
+.admin-status{font-size:.75rem;color:#4aab6d;font-weight:700}
+
 /* ── CTA BANNER ── */
 .cta-banner{background:linear-gradient(135deg,var(--green-dark),var(--green));padding:64px 5%;text-align:center;color:#fff}
 .cta-banner h2{font-family:'Noto Serif KR',serif;font-size:clamp(1.6rem,3.5vw,2.2rem);font-weight:900;margin-bottom:16px}
@@ -323,6 +435,12 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 </head>
 <body>
 
+<!-- 관리자 바 -->
+<div class="admin-bar">
+  <span class="admin-status" id="admin-status" style="display:none">🔑 관리자 모드</span>
+  <button class="admin-login-btn" id="admin-toggle-btn" onclick="toggleAdminLogin()">관리자</button>
+</div>
+
 <!-- 언어 선택 바 -->
 <div class="lang-bar">
   <button class="lang-btn active" onclick="setLang('kor')" id="btn-kor">🇰🇷 한국어</button>
@@ -357,11 +475,11 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
     </div>
     <a href="#training" class="btn-hero-sub" data-i18n="hero_sub">훈련 소개 보기</a>
     <div class="hero-tags">
-      <span>🧠 치매 예방</span>
-      <span>📚 속독 훈련</span>
-      <span>💡 집중력 향상</span>
-      <span>🎯 기억력 강화</span>
-      <span>👁️ 시력 강화</span>
+      <span data-i18n="tag1">🧠 치매 예방</span>
+      <span data-i18n="tag2">📚 속독 훈련</span>
+      <span data-i18n="tag3">💡 집중력 향상</span>
+      <span data-i18n="tag4">🎯 기억력 강화</span>
+      <span data-i18n="tag5">👁️ 시력 강화</span>
     </div>
   </div>
 </section>
@@ -643,6 +761,16 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
       </div>
     </div>
 
+    <!-- 공지사항 작성 (관리자 전용) -->
+    <div id="notice-write-area" style="display:none;margin-bottom:20px">
+      <div class="board-form" style="border-color:#f0c040;background:#fffbea">
+        <div class="board-form-title">📌 공지사항 작성 (관리자)</div>
+        <input type="text" id="notice-title" class="board-input" placeholder="공지 제목" style="width:100%;margin-bottom:10px">
+        <textarea id="notice-content" class="board-textarea" placeholder="공지 내용"></textarea>
+        <button class="btn-submit" style="background:#f0a500" onclick="submitNotice()">공지 등록</button>
+      </div>
+    </div>
+
     <!-- 글 목록 -->
     <div class="post-list-title">💬 <span data-i18n="board_list">전체 글</span></div>
     <div id="post-list">
@@ -686,7 +814,7 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
       </div>
     </div>
     <div class="footer-bottom">
-      <p>© 2025 JS 두뇌훈련 · 개발자: 조성형 · jsmylife153@gmail.com</p>
+      <p>© 2026 JS 두뇌훈련 · 개발자: 조성형 · jsmylife153@gmail.com</p>
       <p data-i18n="footer_disclaimer">본 사이트는 의료적 진단이나 치료를 목적으로 하지 않습니다.</p>
     </div>
   </div>
@@ -704,6 +832,7 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
 // ── i18n 데이터
 const i18n = {
   kor: {
+    tag1:"🧠 치매 예방", tag2:"📚 속독 훈련", tag3:"💡 집중력 향상", tag4:"🎯 기억력 강화", tag5:"👁️ 시력 강화",
     site_name:"두뇌훈련", nav_training:"훈련 소개", nav_lang:"언어 선택", nav_blog:"두뇌 건강 정보",
     nav_board:"게시판", nav_start:"▶ 훈련 시작",
     hero_badge:"✅ 완전 무료 · 앱 설치 불필요 · 시니어 특화",
@@ -748,6 +877,7 @@ const i18n = {
     footer_disclaimer:"본 사이트는 의료적 진단이나 치료를 목적으로 하지 않습니다."
   },
   jpn: {
+    tag1:"🧠 認知症予防", tag2:"📚 速読訓練", tag3:"💡 集中力向上", tag4:"🎯 記憶力強化", tag5:"👁️ 視力強化",
     site_name:"脳トレーニング", nav_training:"トレーニング紹介", nav_lang:"言語選択", nav_blog:"脳健康情報",
     nav_board:"掲示板", nav_start:"▶ トレーニング開始",
     hero_badge:"✅ 完全無料 · アプリ不要 · シニア特化",
@@ -792,6 +922,7 @@ const i18n = {
     footer_disclaimer:"本サイトは医療診断や治療を目的としていません。"
   },
   esp: {
+    tag1:"🧠 Prevenir Alzheimer", tag2:"📚 Lectura Rápida", tag3:"💡 Concentración", tag4:"🎯 Memoria", tag5:"👁️ Visión",
     site_name:"Entrenamiento Cerebral", nav_training:"Entrenamientos", nav_lang:"Idioma", nav_blog:"Salud Cerebral",
     nav_board:"Foro", nav_start:"▶ Comenzar",
     hero_badge:"✅ Completamente Gratis · Sin App · Para Mayores",
@@ -870,6 +1001,84 @@ function setLang(lang) {
   // 게시판 재로드
   if(window._loadPosts) window._loadPosts();
 }
+
+async function deletePost(postId) {
+  if(!window._isAdmin) return;
+  if(!confirm("이 글을 삭제하시겠습니까?")) return;
+  const ok = await window._deletePost(postId);
+  if(ok) { if(window._loadPosts) window._loadPosts(); }
+  else alert("삭제에 실패했습니다.");
+}
+window.deletePost = deletePost;
+
+async function deleteNotice(noticeId) {
+  if(!window._isAdmin) return;
+  if(!confirm("이 공지를 삭제하시겠습니까?")) return;
+  const ok = await window._deleteNotice(noticeId);
+  if(ok) { if(window._loadPosts) window._loadPosts(); }
+  else alert("삭제에 실패했습니다.");
+}
+window.deleteNotice = deleteNotice;
+
+// ── 관리자 기능
+const ADMIN_PW = "js2026admin"; // 필요시 변경
+
+function toggleAdminLogin() {
+  if(window._isAdmin) {
+    // 로그아웃
+    window._isAdmin = false;
+    document.getElementById("admin-status").style.display = "none";
+    document.getElementById("admin-toggle-btn").textContent = "관리자";
+    document.getElementById("notice-write-area").style.display = "none";
+    if(window._loadPosts) window._loadPosts();
+    return;
+  }
+  const pw = prompt("관리자 비밀번호를 입력하세요:");
+  if(pw === ADMIN_PW) {
+    window._isAdmin = true;
+    document.getElementById("admin-status").style.display = "inline";
+    document.getElementById("admin-toggle-btn").textContent = "로그아웃";
+    document.getElementById("notice-write-area").style.display = "block";
+    if(window._loadPosts) window._loadPosts();
+  } else if(pw !== null) {
+    alert("비밀번호가 틀렸습니다.");
+  }
+}
+window.toggleAdminLogin = toggleAdminLogin;
+
+function toggleReplyForm(postId) {
+  const form = document.getElementById("reply-"+postId);
+  if(form) form.classList.toggle("open");
+}
+window.toggleReplyForm = toggleReplyForm;
+
+async function submitReply(postId) {
+  const text = document.getElementById("reply-text-"+postId)?.value || "";
+  if(!text.trim()) return;
+  const ok = await window._submitReply(postId, text);
+  if(ok) {
+    if(window._loadPosts) window._loadPosts();
+  } else {
+    alert("답변 등록에 실패했습니다.");
+  }
+}
+window.submitReply = submitReply;
+
+async function submitNotice() {
+  const title = document.getElementById("notice-title")?.value || "";
+  const content = document.getElementById("notice-content")?.value || "";
+  if(!title.trim()||!content.trim()) { alert("제목과 내용을 입력하세요."); return; }
+  const ok = await window._submitNotice(title, content);
+  if(ok) {
+    document.getElementById("notice-title").value = "";
+    document.getElementById("notice-content").value = "";
+    if(window._loadPosts) window._loadPosts();
+    alert("공지가 등록되었습니다.");
+  } else {
+    alert("공지 등록에 실패했습니다.");
+  }
+}
+window.submitNotice = submitNotice;
 
 // ── 게시판 글 등록
 async function submitPost() {
