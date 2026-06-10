@@ -23,7 +23,7 @@
 <!-- Firebase -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit, serverTimestamp }
+  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit, startAfter, serverTimestamp }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -45,91 +45,133 @@
   function langBadge(l){ return l==="jpn"?"🇯🇵 日本語":l==="esp"?"🇪🇸 Español":"🇰🇷 한국어"; }
   function fmtDate(ts){ return ts ? new Date(ts.toDate()).toLocaleDateString("ko-KR") : ""; }
 
-  // 게시판 글 로드 (공지 먼저, 일반글 최신순)
-  async function loadPosts() {
+  const PAGE_SIZE = 10;
+  let _lastDoc = null;      // 마지막으로 로드된 문서 커서
+  let _allLoaded = false;   // 더 불러올 글이 없는 상태
+
+  function renderPost(docSnap) {
+    const d = docSnap.data();
+    const div = document.createElement("div");
+    div.className = "post-item";
+    div.dataset.id = docSnap.id;
+
+    const replyHtml = d.adminReply
+      ? `<div class="admin-reply">
+          <div class="admin-reply-label">🔑 관리자 답변 · ${fmtDate(d.replyAt)}</div>
+          <div class="admin-reply-text">${escHtml(d.adminReply)}</div>
+         </div>` : "";
+
+    const adminBtn = window._isAdmin
+      ? `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+           <button class="btn-reply-toggle" onclick="toggleReplyForm('${docSnap.id}')">💬 답변 ${d.adminReply?"수정":"작성"}</button>
+           <button class="btn-reply-toggle" style="border-color:#3498db;color:#3498db" onclick="toggleEditForm('${docSnap.id}')">✏️ 수정</button>
+           <button class="btn-delete" onclick="deletePost('${docSnap.id}')">🗑 삭제</button>
+         </div>
+         <div class="reply-form" id="edit-${docSnap.id}">
+           <textarea class="reply-textarea" id="edit-text-${docSnap.id}" placeholder="내용을 수정하세요">${escHtml(d.content||"")}</textarea>
+           <div style="display:flex;gap:8px;align-items:center">
+             <button class="btn-reply-submit" style="background:#3498db" onclick="submitEdit('${docSnap.id}')">수정 완료</button>
+             <button class="btn-reply-toggle" onclick="toggleEditForm('${docSnap.id}')">취소</button>
+           </div>
+         </div>
+         <div class="reply-form" id="reply-${docSnap.id}">
+           <textarea class="reply-textarea" id="reply-text-${docSnap.id}" placeholder="관리자 답변을 입력하세요">${d.adminReply||""}</textarea>
+           <button class="btn-reply-submit" onclick="submitReply('${docSnap.id}')">답변 등록</button>
+         </div>` : "";
+
+    div.innerHTML = `
+      <div class="post-header">
+        <span class="post-name">${escHtml(d.name||"익명")}</span>
+        <span class="post-lang-badge">${langBadge(d.lang||"kor")}</span>
+        <span class="post-date">${fmtDate(d.createdAt)}</span>
+      </div>
+      <div class="post-body">${escHtml(d.content)}</div>
+      ${replyHtml}
+      ${adminBtn}`;
+    return div;
+  }
+
+  // 게시판 글 로드 (공지 먼저, 일반글 10개씩 더보기)
+  async function loadPosts(reset = true) {
     try {
       const list = document.getElementById("post-list");
-      list.innerHTML = '<div class="no-post">불러오는 중...</div>';
 
-      // 공지사항 로드
-      const noticeQ = query(collection(db, "notices"), orderBy("createdAt", "desc"));
-      const noticeSnap = await getDocs(noticeQ);
+      if(reset) {
+        _lastDoc = null;
+        _allLoaded = false;
+        list.innerHTML = '<div class="no-post">불러오는 중...</div>';
 
-      // 일반 글 로드
-      const postQ = query(collection(db, "board"), orderBy("createdAt", "desc"), limit(30));
+        // 공지사항 로드 (항상 전체)
+        const noticeQ = query(collection(db, "notices"), orderBy("createdAt", "desc"));
+        const noticeSnap = await getDocs(noticeQ);
+        list.innerHTML = "";
+
+        noticeSnap.forEach(docSnap => {
+          const d = docSnap.data();
+          const div = document.createElement("div");
+          div.className = "post-item notice";
+          const delBtn = window._isAdmin
+            ? `<button class="btn-delete" onclick="deleteNotice('${docSnap.id}')">🗑 삭제</button>` : "";
+          div.innerHTML = `
+            <div class="post-header">
+              <span class="notice-badge">📌 공지</span>
+              <span class="post-name">${escHtml(d.title||"공지사항")}</span>
+              <span class="post-date">${fmtDate(d.createdAt)}</span>
+              ${delBtn}
+            </div>
+            <div class="post-body">${escHtml(d.content)}</div>`;
+          list.appendChild(div);
+        });
+      } else {
+        // 더보기 — 기존 더보기 버튼 제거
+        const oldBtn = document.getElementById("load-more-btn");
+        if(oldBtn) oldBtn.remove();
+      }
+
+      // 일반 글 쿼리
+      let postQ;
+      if(_lastDoc) {
+        postQ = query(collection(db, "board"), orderBy("createdAt","desc"), startAfter(_lastDoc), limit(PAGE_SIZE));
+      } else {
+        postQ = query(collection(db, "board"), orderBy("createdAt","desc"), limit(PAGE_SIZE));
+      }
+
       const postSnap = await getDocs(postQ);
 
-      if(noticeSnap.empty && postSnap.empty){
-        list.innerHTML = '<div class="no-post" data-i18n="board_empty">첫 번째 글을 남겨보세요!</div>';
+      if(postSnap.empty && reset && document.querySelectorAll(".post-item:not(.notice)").length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "no-post";
+        empty.setAttribute("data-i18n","board_empty");
+        empty.textContent = "첫 번째 글을 남겨보세요!";
+        list.appendChild(empty);
         return;
       }
 
-      list.innerHTML = "";
-
-      // 공지사항 렌더링
-      noticeSnap.forEach(docSnap => {
-        const d = docSnap.data();
-        const div = document.createElement("div");
-        div.className = "post-item notice";
-        const delBtn = window._isAdmin
-          ? `<button class="btn-delete" onclick="deleteNotice('${docSnap.id}')">🗑 삭제</button>` : "";
-        div.innerHTML = `
-          <div class="post-header">
-            <span class="notice-badge">📌 공지</span>
-            <span class="post-name">${escHtml(d.title||"공지사항")}</span>
-            <span class="post-date">${fmtDate(d.createdAt)}</span>
-            ${delBtn}
-          </div>
-          <div class="post-body">${escHtml(d.content)}</div>`;
-        list.appendChild(div);
-      });
-
-      // 일반 글 렌더링
       postSnap.forEach(docSnap => {
-        const d = docSnap.data();
-        const div = document.createElement("div");
-        div.className = "post-item";
-        div.dataset.id = docSnap.id;
-
-        const replyHtml = d.adminReply
-          ? `<div class="admin-reply">
-              <div class="admin-reply-label">🔑 관리자 답변 · ${fmtDate(d.replyAt)}</div>
-              <div class="admin-reply-text">${escHtml(d.adminReply)}</div>
-             </div>` : "";
-
-        const adminBtn = window._isAdmin
-          ? `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
-               <button class="btn-reply-toggle" onclick="toggleReplyForm('${docSnap.id}')">💬 답변 ${d.adminReply ? "수정":"작성"}</button>
-               <button class="btn-reply-toggle" style="border-color:#3498db;color:#3498db" onclick="toggleEditForm('${docSnap.id}')">✏️ 수정</button>
-               <button class="btn-delete" onclick="deletePost('${docSnap.id}')">🗑 삭제</button>
-             </div>
-             <div class="reply-form" id="edit-${docSnap.id}">
-               <textarea class="reply-textarea" id="edit-text-${docSnap.id}" placeholder="내용을 수정하세요">${escHtml(d.content||"")}</textarea>
-               <div style="display:flex;gap:8px;align-items:center">
-                 <button class="btn-reply-submit" style="background:#3498db" onclick="submitEdit('${docSnap.id}')">수정 완료</button>
-                 <button class="btn-reply-toggle" onclick="toggleEditForm('${docSnap.id}')">취소</button>
-               </div>
-             </div>
-             <div class="reply-form" id="reply-${docSnap.id}">
-               <textarea class="reply-textarea" id="reply-text-${docSnap.id}" placeholder="관리자 답변을 입력하세요">${d.adminReply||""}</textarea>
-               <button class="btn-reply-submit" onclick="submitReply('${docSnap.id}')">답변 등록</button>
-             </div>` : "";
-
-        div.innerHTML = `
-          <div class="post-header">
-            <span class="post-name">${escHtml(d.name||"익명")}</span>
-            <span class="post-lang-badge">${langBadge(d.lang||"kor")}</span>
-            <span class="post-date">${fmtDate(d.createdAt)}</span>
-          </div>
-          <div class="post-body">${escHtml(d.content)}</div>
-          ${replyHtml}
-          ${adminBtn}`;
-        list.appendChild(div);
+        list.appendChild(renderPost(docSnap));
       });
+
+      // 커서 업데이트
+      if(postSnap.docs.length > 0) {
+        _lastDoc = postSnap.docs[postSnap.docs.length - 1];
+      }
+
+      // 더 불러올 글이 있으면 더보기 버튼 표시
+      if(postSnap.docs.length < PAGE_SIZE) {
+        _allLoaded = true;
+      } else {
+        const btn = document.createElement("div");
+        btn.id = "load-more-btn";
+        btn.style.cssText = "text-align:center;margin-top:16px";
+        btn.innerHTML = `<button class="btn-submit" style="background:var(--green-light);color:var(--green-dark);border:1.5px solid var(--border)" onclick="loadMorePosts()">📋 더보기</button>`;
+        list.appendChild(btn);
+      }
+
     } catch(e) { console.error("loadPosts error",e); }
   }
 
   window._loadPosts = loadPosts;
+  window._loadMorePosts = function(){ loadPosts(false); };
 
   // 일반 글 등록
   window._submitPost = async function(name, content, lang) {
@@ -1044,6 +1086,12 @@ async function submitEdit(postId) {
   }
 }
 window.submitEdit = submitEdit;
+
+function loadMorePosts() {
+  if(window._allLoaded) return;
+  if(window._loadMorePosts) window._loadMorePosts();
+}
+window.loadMorePosts = loadMorePosts;
 
 // ── 관리자 기능
 const ADMIN_PW = "js2026admin"; // 필요시 변경
