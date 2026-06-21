@@ -354,20 +354,6 @@ nav a:hover{color:var(--green)}
 .blog-meta{display:flex;gap:12px;margin-top:10px;padding-top:12px;border-top:1px solid var(--border)}
 .blog-meta span{font-size:.75rem;color:var(--text-soft)}
 
-/* ── ARTICLE MODAL ── */
-.article-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:40px 20px}
-.article-overlay.open{display:flex;justify-content:center;align-items:flex-start}
-.article-box{background:#fff;border-radius:var(--r);max-width:720px;width:100%;padding:40px;position:relative;margin:auto}
-.article-close{position:absolute;top:16px;right:16px;width:36px;height:36px;background:var(--border);border:none;border-radius:50%;font-size:1.2rem;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-mid)}
-.article-box h2{font-family:'Noto Serif KR',serif;font-size:1.5rem;font-weight:900;margin-bottom:8px;line-height:1.35}
-.article-box .article-tag{font-size:.8rem;color:var(--green);font-weight:700;margin-bottom:20px;display:block}
-.article-box .article-content{font-size:.95rem;line-height:1.95;color:var(--text-mid)}
-.article-box .article-content h3{font-family:'Noto Serif KR',serif;font-size:1.1rem;font-weight:700;color:var(--text);margin:24px 0 10px}
-.article-box .article-content p{margin-bottom:14px}
-.article-box .article-content ul{padding-left:20px;margin-bottom:14px}
-.article-box .article-content li{margin-bottom:6px}
-.article-source{font-size:.75rem;color:#aaa;margin-top:24px;padding-top:16px;border-top:1px solid var(--border)}
-
 /* ── HOW TO ── */
 .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
 .step-card{background:#fff;border-radius:var(--r);padding:28px 22px;text-align:center;border:1.5px solid var(--border)}
@@ -473,7 +459,6 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
   .stats-inner{grid-template-columns:repeat(2,1fr)}
   .footer-top{grid-template-columns:1fr}
   .footer-bottom{flex-direction:column;text-align:center}
-  .article-box{padding:24px}
   .board-row{flex-direction:column}
 }
 @media(max-width:480px){
@@ -602,7 +587,7 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
       </div>
     </div>
     <div style="text-align:center;margin-top:40px">
-      <a href="/kor/app.html" class="btn-lang-start kor" style="display:inline-flex" data-i18n="train_cta">▶ 5가지 훈련 지금 시작하기</a>
+      <p style="color:var(--text-soft);font-size:.92rem" data-i18n="train_guide">아래에서 언어를 선택하면 5가지 훈련을 바로 시작할 수 있습니다 ↓</p>
     </div>
   </div>
 </section>
@@ -814,14 +799,6 @@ footer{background:var(--green-dark);color:rgba(255,255,255,.85);padding:48px 5% 
   </div>
 </footer>
 
-<!-- ARTICLE MODAL -->
-<div class="article-overlay" id="overlay" onclick="if(event.target===this)closeArticle()">
-  <div class="article-box">
-    <button class="article-close" onclick="closeArticle()">✕</button>
-    <div id="articleContent"></div>
-  </div>
-</div>
-
 <script>
 // ── 블로그 카드 렌더링
 function renderBlog(lang) {
@@ -829,14 +806,24 @@ function renderBlog(lang) {
   if(!grid) return;
   const cards = i18n[lang].blog_cards;
   if(!cards) return;
+  const slugMap = {
+    a1: "a1-dementia-prevention",
+    a2: "a2-memory-aging",
+    a3: "a3-speed-reading",
+    a4: "a4-concentration",
+    a5: "a5-senior-30min-routine",
+    a6: "a6-bible-memorization-brain"
+  };
   grid.innerHTML = cards.map(c => `
     <div class="blog-card fade-up">
-      <div class="blog-thumb" style="background:${c.bg}">${c.icon}</div>
+      <a href="/blog/${slugMap[c.id]}.html" style="display:block">
+        <div class="blog-thumb" style="background:${c.bg}">${c.icon}</div>
+      </a>
       <div class="blog-body">
         <div class="blog-tag">${c.tag}</div>
-        <h3>${c.title}</h3>
+        <a href="/blog/${slugMap[c.id]}.html" style="display:block"><h3>${c.title}</h3></a>
         <p>${c.desc}</p>
-        <button class="blog-read" onclick="openArticle('${c.id}')">${c.read}</button>
+        <a href="/blog/${slugMap[c.id]}.html" class="blog-read">${c.read}</a>
         <div class="blog-meta"><span>${c.meta1}</span><span>${c.meta2}</span></div>
       </div>
     </div>`).join("");
@@ -873,7 +860,7 @@ const i18n = {
     train_label:"5가지 두뇌 훈련",
     train_h2:"과학적으로 설계된<br>두뇌 강화 프로그램",
     train_p:"각 훈련은 뇌의 서로 다른 영역을 자극하여 종합적인 인지 기능 향상을 돕습니다",
-    train_cta:"▶ 5가지 훈련 지금 시작하기",
+    train_guide:"아래에서 언어를 선택하면 5가지 훈련을 바로 시작할 수 있습니다 ↓",
     t1_title:"시력강화 훈련", t1_desc:"격자 위를 이동하는 도형을 눈으로 추적하며 안구 근육을 단련하고 시야를 확장합니다", t1_badge:"준비 운동",
     t2_title:"집중력 훈련", t2_desc:"순식간에 나타났다 사라지는 낱말을 포착하는 훈련으로 순간 인식력과 주의력을 키웁니다", t2_badge:"핵심 훈련",
     t3_title:"기억력 훈련", t3_desc:"여러 위치에 등장하는 낱말을 기억하는 훈련으로 단기 기억력과 작업 기억을 강화합니다", t3_badge:"핵심 훈련",
@@ -926,7 +913,7 @@ const i18n = {
     train_label:"5つの脳トレーニング",
     train_h2:"科学的に設計された<br>脳強化プログラム",
     train_p:"各トレーニングは脳の異なる領域を刺激し、総合的な認知機能の向上を助けます",
-    train_cta:"▶ 5つのトレーニングを今すぐ始める",
+    train_guide:"下記から言語を選択すると5つのトレーニングをすぐに始められます ↓",
     t1_title:"視力強化トレーニング", t1_desc:"格子上を移動する図形を目で追跡し、眼筋を鍛えて視野を拡張します", t1_badge:"準備運動",
     t2_title:"集中力トレーニング", t2_desc:"瞬時に現れて消える単語を捉える訓練で、瞬間認識力と注意力を鍛えます", t2_badge:"コアトレーニング",
     t3_title:"記憶力トレーニング", t3_desc:"複数の位置に登場する単語を記憶する訓練で、短期記憶力と作業記憶を強化します", t3_badge:"コアトレーニング",
@@ -979,7 +966,7 @@ const i18n = {
     train_label:"5 ENTRENAMIENTOS CEREBRALES",
     train_h2:"Un programa diseñado<br>científicamente",
     train_p:"Cada entrenamiento estimula diferentes áreas del cerebro para una mejora cognitiva integral",
-    train_cta:"▶ Comenzar los 5 entrenamientos ahora",
+    train_guide:"Elige tu idioma abajo para comenzar los 5 entrenamientos ↓",
     t1_title:"Entrenamiento Visual", t1_desc:"Sigue con los ojos figuras en movimiento para fortalecer los músculos oculares y ampliar el campo visual", t1_badge:"Calentamiento",
     t2_title:"Concentración", t2_desc:"Captura palabras que aparecen y desaparecen en instantes para desarrollar la atención y el reconocimiento", t2_badge:"Entrenamiento clave",
     t3_title:"Memoria", t3_desc:"Recuerda palabras en múltiples posiciones para fortalecer la memoria a corto plazo y la memoria de trabajo", t3_badge:"Entrenamiento clave",
@@ -1215,35 +1202,6 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
     target.scrollIntoView({behavior:'smooth', block:'start'});
   });
 });
-
-// ── 아티클 모달
-const articles = {
-  a1:{tag:'치매 예방',title:'치매 예방을 위한 두뇌 훈련 7가지',content:`<h3>두뇌 훈련이 치매를 예방하는 이유</h3><p>65세 이상 노인 10명 중 1명이 치매를 앓고 있습니다. 하지만 꾸준한 두뇌 훈련으로 치매 발생 위험을 최대 35% 낮출 수 있다는 연구 결과가 있습니다.</p><h3>과학적으로 검증된 7가지 두뇌 훈련</h3><ul><li><strong>집중력 훈련</strong> — 주의 집중 시간을 늘리고 정보 처리 속도를 향상시킵니다.</li><li><strong>기억력 훈련</strong> — 단기 기억과 장기 기억을 연결하는 해마 기능을 강화합니다.</li><li><strong>언어 훈련</strong> — 어휘력 향상과 언어 중추 활성화로 인지 예비력을 높입니다.</li><li><strong>시각 훈련</strong> — 공간 인식과 시각 처리 속도를 개선합니다.</li><li><strong>문제 해결 훈련</strong> — 전두엽의 실행 기능을 강화합니다.</li><li><strong>독서 훈련</strong> — 다양한 뇌 영역을 동시에 활성화합니다.</li><li><strong>신체 활동</strong> — 뇌 혈류를 증가시키고 신경 성장 인자를 분비시킵니다.</li></ul><div class="article-source">출처: 서울대학교병원 노인건강연구소, 한국치매협회</div>`},
-  a2:{tag:'노화와 기억력',title:'60대 이후 기억력 저하, 원인과 해결책',content:`<h3>왜 나이가 들면 기억력이 떨어질까요?</h3><p>뇌세포 감소, 신경전달물질 변화, 혈류 감소 등 다양한 원인이 있습니다. 하지만 뇌는 훈련으로 변화할 수 있습니다.</p><h3>효과적인 해결책</h3><ul><li><strong>꾸준한 인지 훈련</strong> — 매일 30분의 두뇌 훈련이 기억력 회복에 효과적입니다.</li><li><strong>충분한 수면</strong> — 수면 중 기억이 장기 기억으로 저장됩니다.</li><li><strong>규칙적인 운동</strong> — 유산소 운동이 해마 크기를 증가시킵니다.</li></ul><div class="article-source">출처: 한국뇌연구원, Alzheimer's Association</div>`},
-  a3:{tag:'속독 원리',title:'속독의 원리 — 눈이 아닌 뇌로 읽는 법',content:`<h3>속독이란 무엇인가?</h3><p>일반인의 독서 속도는 분당 200~300자 수준입니다. 속독 훈련으로 분당 600자 이상 읽으면서도 이해도를 높일 수 있습니다.</p><h3>핵심 원리</h3><ul><li><strong>안구 운동 훈련</strong> — 도약 운동(Saccade)을 훈련하여 한 번에 더 많은 텍스트를 인식합니다.</li><li><strong>묵독 제거</strong> — 마음속으로 읽는 습관을 제거하면 속도가 2배 이상 빨라집니다.</li><li><strong>주변 시야 활용</strong> — 시야를 넓혀 한 줄을 2~3개의 덩어리로 파악합니다.</li></ul><div class="article-source">출처: 한국안과학회, Vision Research Journal</div>`},
-  a4:{tag:'집중력',title:'집중력이 3배 좋아지는 생활 습관 5가지',content:`<h3>집중력도 훈련이 가능합니다</h3><p>집중력은 타고나는 것이 아닙니다. 올바른 생활 습관과 꾸준한 훈련으로 누구나 향상시킬 수 있습니다.</p><h3>5가지 핵심 습관</h3><ul><li><strong>수면 최적화</strong> — 7~8시간의 규칙적인 수면이 전두엽 기능을 회복시킵니다.</li><li><strong>디지털 디톡스</strong> — 훈련 중 스마트폰을 다른 방에 두세요.</li><li><strong>단일 과제 집중</strong> — 멀티태스킹은 집중력을 소모시킵니다.</li><li><strong>포모도로 기법</strong> — 25분 집중, 5분 휴식 사이클을 활용하세요.</li><li><strong>두뇌 훈련</strong> — 매일 집중력 훈련으로 신경 회로를 강화합니다.</li></ul><div class="article-source">출처: 하버드 의대, Microsoft Research</div>`},
-  a5:{tag:'시니어 건강',title:'시니어를 위한 하루 30분 두뇌 운동법',content:`<h3>시니어에게 최적화된 훈련 루틴</h3><p>하루 30분, 5가지 훈련을 순서대로 진행하면 최대의 효과를 얻을 수 있습니다.</p><ul><li><strong>시력강화 (5분)</strong> — 안구 운동으로 준비 운동을 합니다.</li><li><strong>집중력 훈련 (10분)</strong> — 낱말 집중력 훈련으로 순간 인식력을 키웁니다.</li><li><strong>기억력 훈련 (10분)</strong> — 단기 기억을 강화합니다.</li><li><strong>독해 훈련 (5분)</strong> — 독서능력 향상 훈련으로 마무리합니다.</li></ul><div class="article-source">출처: 서울대학교병원 노인건강연구소, 한국치매협회</div>`},
-  a6:{tag:'성경과 두뇌',title:'성경 암송이 뇌 건강에 미치는 놀라운 영향',content:`<h3>암송, 최고의 두뇌 훈련</h3><p>성경을 암송하는 행위는 단순한 신앙 활동을 넘어 뇌 건강에도 탁월한 효과가 있습니다. 신경과학 연구들은 규칙적인 암송이 해마 기능을 강화하고 알츠하이머 발병을 늦출 수 있음을 보여줍니다.</p><h3>암송의 3가지 두뇌 효과</h3><ul><li><strong>해마 강화</strong> — 반복 학습이 해마의 신경 연결을 강화합니다.</li><li><strong>언어 중추 활성화</strong> — 의미 있는 문장을 외우는 과정이 좌뇌 언어 중추를 자극합니다.</li><li><strong>집중력 향상</strong> — 암송에 필요한 깊은 집중이 전두엽을 강화합니다.</li></ul><div class="article-source">출처: Journal of Religion and Health, Neuroscience & Biobehavioral Reviews</div>`}
-};
-
-function openArticle(id) {
-  const a = articles[id];
-  if(!a) return;
-  document.getElementById('articleContent').innerHTML =
-    '<span class="article-tag">'+a.tag+'</span><h2>'+a.title+'</h2><div class="article-content">'+a.content+'</div>';
-  const ov = document.getElementById('overlay');
-  ov.classList.add('open');
-  ov.scrollTop = 0;
-  document.body.style.cssText = 'overflow:hidden;position:fixed;width:100%;top:-'+window.scrollY+'px';
-}
-function closeArticle() {
-  const ov = document.getElementById('overlay');
-  ov.classList.remove('open');
-  const top = document.body.style.top;
-  document.body.style.cssText = '';
-  window.scrollTo(0, -(parseInt(top||'0')));
-}
-document.addEventListener('keydown', e => { if(e.key==='Escape') closeArticle(); });
 </script>
 <script>
 if('serviceWorker' in navigator){
