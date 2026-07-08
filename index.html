@@ -2,316 +2,832 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="JS 두뇌훈련 - 어르신을 위한 시력강화, 집중력, 기억력, 문장기억, 독서능력 훈련 앱. 한글훈련과 영어훈련을 선택하여 즐길 수 있습니다.">
-<title>JS 두뇌훈련 — 매일 5분, 뇌를 깨워요</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="JS 두뇌훈련 — 시력강화·집중력·기억력·문장기억·독서능력 5가지 무료 두뇌 훈련. 어르신 맞춤 설계, 한글·영어 훈련 지원. 치매 예방과 인지 기능 향상에 도움이 되는 과학적 두뇌 훈련 프로그램.">
+<meta name="keywords" content="두뇌훈련,집중력향상,기억력향상,치매예방,속독,독서능력,시니어두뇌건강,안구운동,무료훈련,영어학습,어르신운동">
+<meta name="author" content="JS 두뇌훈련">
+<meta property="og:title" content="JS 두뇌훈련 — 매일 5분, 뇌를 깨워요">
+<meta property="og:description" content="시력강화·집중력·기억력·문장기억·독서능력 5가지 무료 두뇌 훈련. 한글·영어 훈련 동시 제공.">
+<meta property="og:url" content="https://jsmylife153.github.io/">
+<meta property="og:type" content="website">
+<title>JS 두뇌훈련 — 집중력·기억력·치매예방 무료 훈련 | 어르신 맞춤 두뇌 강화 프로그램</title>
+<link rel="canonical" href="https://jsmylife153.github.io/">
+<link rel="manifest" href="/kor/manifest.json">
+<link rel="apple-touch-icon" href="/kor/icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+
+<script type="module">
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, limit, startAfter, serverTimestamp }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBsbRuKEYZBU5oKNJwZMAK4XUhcq7yKd0Q",
+    authDomain: "js-trainer-kor.firebaseapp.com",
+    projectId: "js-trainer-kor",
+    storageBucket: "js-trainer-kor.firebasestorage.app",
+    messagingSenderId: "315054866321",
+    appId: "1:315054866321:web:11ad102d933fc66c042430"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  window._db = db;
+  window._fbReady = true;
+  window._isAdmin = false;
+
+  function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  
+  function fmtDate(ts){ return ts ? new Date(ts.toDate()).toLocaleDateString("ko-KR") : ""; }
+
+  const PAGE_SIZE = 10;
+  let _lastDoc = null;      // 마지막으로 로드된 문서 커서
+  let _allLoaded = false;   // 더 불러올 글이 없는 상태
+
+  function renderPost(docSnap) {
+    const d = docSnap.data();
+    const div = document.createElement("div");
+    div.className = "post-item";
+    div.dataset.id = docSnap.id;
+
+    const replyHtml = d.adminReply
+      ? `<div class="admin-reply">
+          <div class="admin-reply-label">🔑 관리자 답변 · ${fmtDate(d.replyAt)}</div>
+          <div class="admin-reply-text">${escHtml(d.adminReply)}</div>
+         </div>` : "";
+
+    const adminBtn = window._isAdmin
+      ? `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+           <button class="btn-reply-toggle" onclick="toggleReplyForm('${docSnap.id}')">💬 답변 ${d.adminReply?"수정":"작성"}</button>
+           <button class="btn-reply-toggle" style="border-color:#3498db;color:#3498db" onclick="toggleEditForm('${docSnap.id}')">✏️ 수정</button>
+           <button class="btn-delete" onclick="deletePost('${docSnap.id}')">🗑 삭제</button>
+         </div>
+         <div class="reply-form" id="edit-${docSnap.id}">
+           <textarea class="reply-textarea" id="edit-text-${docSnap.id}" placeholder="내용을 수정하세요">${escHtml(d.content||"")}</textarea>
+           <div style="display:flex;gap:8px;align-items:center">
+             <button class="btn-reply-submit" style="background:#3498db" onclick="submitEdit('${docSnap.id}')">수정 완료</button>
+             <button class="btn-reply-toggle" onclick="toggleEditForm('${docSnap.id}')">취소</button>
+           </div>
+         </div>
+         <div class="reply-form" id="reply-${docSnap.id}">
+           <textarea class="reply-textarea" id="reply-text-${docSnap.id}" placeholder="관리자 답변을 입력하세요">${d.adminReply||""}</textarea>
+           <button class="btn-reply-submit" onclick="submitReply('${docSnap.id}')">답변 등록</button>
+         </div>` : "";
+
+    div.innerHTML = `
+      <div class="post-header">
+        <span class="post-name">${escHtml(d.name||"익명")}</span>
+        
+        <span class="post-date">${fmtDate(d.createdAt)}</span>
+      </div>
+      <div class="post-body">${escHtml(d.content)}</div>
+      ${replyHtml}
+      ${adminBtn}`;
+    return div;
+  }
+
+  // 게시판 글 로드 (공지 먼저, 일반글 10개씩 더보기)
+  async function loadPosts(reset = true) {
+    try {
+      const list = document.getElementById("post-list");
+
+      if(reset) {
+        _lastDoc = null;
+        _allLoaded = false;
+        list.innerHTML = '<div class="no-post">불러오는 중...</div>';
+
+        // 공지사항 로드 (항상 전체)
+        const noticeQ = query(collection(db, "notices"), orderBy("createdAt", "desc"));
+        const noticeSnap = await getDocs(noticeQ);
+        list.innerHTML = "";
+
+        noticeSnap.forEach(docSnap => {
+          const d = docSnap.data();
+          const div = document.createElement("div");
+          div.className = "post-item notice";
+          const delBtn = window._isAdmin
+            ? `<button class="btn-delete" onclick="deleteNotice('${docSnap.id}')">🗑 삭제</button>` : "";
+          div.innerHTML = `
+            <div class="post-header">
+              <span class="notice-badge">📌 공지</span>
+              <span class="post-name">${escHtml(d.title||"공지사항")}</span>
+              <span class="post-date">${fmtDate(d.createdAt)}</span>
+              ${delBtn}
+            </div>
+            <div class="post-body">${escHtml(d.content)}</div>`;
+          list.appendChild(div);
+        });
+      } else {
+        // 더보기 — 기존 더보기 버튼 제거
+        const oldBtn = document.getElementById("load-more-btn");
+        if(oldBtn) oldBtn.remove();
+      }
+
+      // 일반 글 쿼리
+      let postQ;
+      if(_lastDoc) {
+        postQ = query(collection(db, "board"), orderBy("createdAt","desc"), startAfter(_lastDoc), limit(PAGE_SIZE));
+      } else {
+        postQ = query(collection(db, "board"), orderBy("createdAt","desc"), limit(PAGE_SIZE));
+      }
+
+      const postSnap = await getDocs(postQ);
+
+      if(postSnap.empty && reset && document.querySelectorAll(".post-item:not(.notice)").length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "no-post";
+        empty.setAttribute("data-i18n","board_empty");
+        empty.textContent = "첫 번째 글을 남겨보세요!";
+        list.appendChild(empty);
+        return;
+      }
+
+      postSnap.forEach(docSnap => {
+        list.appendChild(renderPost(docSnap));
+      });
+
+      // 커서 업데이트
+      if(postSnap.docs.length > 0) {
+        _lastDoc = postSnap.docs[postSnap.docs.length - 1];
+      }
+
+      // 더 불러올 글이 있으면 더보기 버튼 표시
+      if(postSnap.docs.length < PAGE_SIZE) {
+        _allLoaded = true;
+      } else {
+        const btn = document.createElement("div");
+        btn.id = "load-more-btn";
+        btn.style.cssText = "text-align:center;margin-top:16px";
+        btn.innerHTML = `<button class="btn-submit" style="background:var(--green-light);color:var(--green-dark);border:1.5px solid var(--border)" onclick="loadMorePosts()">📋 더보기</button>`;
+        list.appendChild(btn);
+      }
+
+    } catch(e) { console.error("loadPosts error",e); }
+  }
+
+  window._loadPosts = loadPosts;
+  window._loadMorePosts = function(){ loadPosts(false); };
+
+  // 일반 글 등록
+  window._submitPost = async function(name, content) {
+    if(!name.trim()||!content.trim()) return false;
+    try {
+      await addDoc(collection(db, "board"), {
+        name: name.trim().slice(0,20),
+        content: content.trim().slice(0,500),
+        
+        createdAt: serverTimestamp()
+      });
+      return true;
+    } catch(e){ console.error("submitPost error",e); return false; }
+  };
+
+  // 공지 등록
+  window._submitNotice = async function(title, content) {
+    if(!title.trim()||!content.trim()) return false;
+    try {
+      await addDoc(collection(db, "notices"), {
+        title: title.trim().slice(0,50),
+        content: content.trim().slice(0,1000),
+        createdAt: serverTimestamp()
+      });
+      return true;
+    } catch(e){ console.error("submitNotice error",e); return false; }
+  };
+
+  // 관리자 답변 등록
+  window._submitReply = async function(postId, replyText) {
+    if(!replyText.trim()) return false;
+    try {
+      await updateDoc(doc(db, "board", postId), {
+        adminReply: replyText.trim().slice(0,1000),
+        replyAt: serverTimestamp()
+      });
+      return true;
+    } catch(e){ console.error("submitReply error",e); return false; }
+  };
+
+  // 글 내용 수정 (관리자 전용)
+  window._editPost = async function(postId, newContent) {
+    if(!newContent.trim()) return false;
+    try {
+      await updateDoc(doc(db, "board", postId), {
+        content: newContent.trim().slice(0, 500),
+        editedAt: serverTimestamp()
+      });
+      return true;
+    } catch(e){ console.error("editPost error",e); return false; }
+  };
+
+  // 글 삭제 (관리자 전용)
+  window._deletePost = async function(postId) {
+    try {
+      await deleteDoc(doc(db, "board", postId));
+      return true;
+    } catch(e){ console.error("deletePost error",e); return false; }
+  };
+  window._deleteNotice = async function(noticeId) {
+    try { await deleteDoc(doc(db, "notices", noticeId)); return true; }
+    catch(e){ console.error("deleteNotice error",e); return false; }
+  };
+
+  document.addEventListener("DOMContentLoaded", () => { loadPosts(); });
+
+</script>
+
 <style>
-  *{margin:0;padding:0;box-sizing:border-box;}
-  :root{
-    --green:#2d8c4e;
-    --green-light:#99FF66;
-    --green-dark:#1a5e33;
-    --blue:#378ADD;
-    --bg:#f4f9f4;
-    --card:#ffffff;
-    --text:#1a1a1a;
-    --muted:#666;
-  }
-  html{scroll-behavior:smooth;}
-  body{
-    font-family:'Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif;
-    background:var(--bg);
-    color:var(--text);
-    line-height:1.6;
-    min-height:100vh;
-  }
+:root{
+  --green:#2d8c4e;--green-light:#e8f5ec;--green-mid:#4aab6d;--green-dark:#1a5e33;
+  --blue:#378ADD;--blue-light:#e8f1fd;
+  --accent:#f0a500;--accent-light:#fff8e6;
+  --text:#1a1a1a;--text-mid:#444;--text-soft:#777;
+  --white:#fff;--bg:#f9faf8;--border:#dde8e0;
+  --shadow:0 4px 24px rgba(45,140,78,.12);--shadow-lg:0 12px 48px rgba(45,140,78,.18);
+  --r:16px;--r-sm:10px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);line-height:1.75;font-size:16px;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+input,select,textarea{font-size:16px!important;font-family:inherit}
 
-  /* ── 상단 헤더 ── */
-  header{
-    background:linear-gradient(135deg,var(--green-dark) 0%,var(--green) 60%,#4aab66 100%);
-    padding:48px 24px 56px;
-    text-align:center;
-    position:relative;
-    overflow:hidden;
-  }
-  header::before{
-    content:'';
-    position:absolute;inset:0;
-    background:radial-gradient(ellipse at 70% 20%, rgba(153,255,102,.18) 0%, transparent 60%);
-    pointer-events:none;
-  }
-  .logo{
-    font-size:15px;font-weight:700;color:rgba(255,255,255,.65);
-    letter-spacing:.15em;text-transform:uppercase;margin-bottom:14px;
-  }
-  h1{
-    font-size:clamp(32px,7vw,56px);
-    font-weight:900;color:#fff;
-    line-height:1.15;margin-bottom:12px;
-    letter-spacing:-.02em;
-  }
-  h1 span{color:var(--green-light);}
-  .sub{
-    font-size:clamp(16px,3.5vw,22px);
-    color:rgba(255,255,255,.82);
-    margin-bottom:36px;
-    font-weight:400;
-  }
+/* HEADER */
+header{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border);padding:0 5%}
+.header-inner{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{font-family:'Noto Serif KR',serif;font-weight:900;font-size:1.25rem;color:var(--green-dark);display:flex;align-items:center;gap:8px}
+.logo-badge{background:var(--green);color:#fff;padding:2px 10px;border-radius:20px;font-size:.85rem}
+nav{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+nav a{font-size:.9rem;color:var(--text-mid);font-weight:500;transition:color .2s;white-space:nowrap}
+nav a:hover{color:var(--green)}
+.btn-start{background:var(--green);color:#fff!important;padding:8px 20px;border-radius:24px;font-weight:700;font-size:.9rem;transition:all .2s;box-shadow:0 2px 12px rgba(45,140,78,.3)}
+.btn-start:hover{background:var(--green-dark);transform:translateY(-1px)}
 
-  /* ── 메인 CTA 버튼 2개 ── */
-  .hero-btns{
-    display:flex;flex-wrap:wrap;gap:14px;
-    justify-content:center;
-  }
-  .btn-hero{
-    display:inline-flex;align-items:center;gap:10px;
-    padding:18px 36px;border-radius:14px;
-    font-size:clamp(18px,4vw,24px);font-weight:800;
-    text-decoration:none;border:none;cursor:pointer;
-    transition:transform .15s,box-shadow .15s;
-  }
-  .btn-hero:active{transform:scale(.97);}
-  .btn-kor{
-    background:var(--green-light);color:var(--green-dark);
-    box-shadow:0 6px 28px rgba(45,140,78,.35);
-  }
-  .btn-kor:hover{box-shadow:0 8px 36px rgba(45,140,78,.5);}
-  .btn-en{
-    background:#fff;color:var(--green-dark);
-    box-shadow:0 6px 28px rgba(0,0,0,.18);
-  }
-  .btn-en:hover{box-shadow:0 8px 36px rgba(0,0,0,.28);}
-  .btn-icon{font-size:1.3em;}
+/* HERO */
+.hero{background:linear-gradient(135deg,var(--green-dark) 0%,var(--green) 55%,#3aaa5e 100%);color:#fff;padding:80px 5% 90px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-60px;right:-80px;width:400px;height:400px;background:rgba(255,255,255,.06);border-radius:50%;pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:-80px;left:-60px;width:300px;height:300px;background:rgba(255,255,255,.05);border-radius:50%;pointer-events:none}
+.hero-inner{max-width:780px;margin:0 auto;position:relative;z-index:1}
+.hero-badge{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;padding:5px 18px;border-radius:24px;font-size:.82rem;font-weight:600;margin-bottom:24px;letter-spacing:.05em}
+.hero h1{font-family:'Noto Serif KR',serif;font-size:clamp(1.9rem,5vw,3rem);font-weight:900;line-height:1.25;margin-bottom:20px;text-shadow:0 2px 16px rgba(0,0,0,.15)}
+.hero h1 em{font-style:normal;color:#ffe082}
+.hero-sub{font-size:clamp(1rem,2.5vw,1.15rem);opacity:.92;margin-bottom:40px;max-width:560px;margin-left:auto;margin-right:auto}
+.hero-btns{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-bottom:20px}
+.btn-hero{display:inline-flex;align-items:center;gap:8px;padding:15px 32px;border-radius:50px;font-weight:800;font-size:1rem;text-decoration:none;border:none;cursor:pointer;font-family:inherit;transition:all .25s}
+.btn-hero:hover{transform:translateY(-3px)}
+.btn-kor{background:#fff;color:var(--green-dark);box-shadow:0 4px 24px rgba(0,0,0,.2)}
+.btn-en{background:rgba(55,138,221,.9);color:#fff;border:2px solid rgba(255,255,255,.4)}
+.hero-tags{margin-top:36px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.hero-tags span{background:rgba(255,255,255,.15);color:rgba(255,255,255,.9);padding:4px 14px;border-radius:16px;font-size:.8rem}
 
-  /* ── 본문 섹션 공통 ── */
-  section{padding:56px 20px;}
-  .inner{max-width:780px;margin:0 auto;}
-  .sec-label{
-    font-size:12px;font-weight:700;letter-spacing:.18em;
-    color:var(--green);text-transform:uppercase;margin-bottom:8px;
-  }
-  h2{
-    font-size:clamp(24px,5vw,36px);font-weight:900;
-    color:var(--text);margin-bottom:16px;line-height:1.2;
-  }
-  .lead{font-size:clamp(15px,3vw,18px);color:var(--muted);margin-bottom:32px;}
+/* STATS */
+.stats{background:#fff;padding:56px 5%;border-bottom:1px solid var(--border)}
+.stats-inner{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center}
+.stat-item{padding:20px 12px}
+.stat-num{font-family:'Noto Serif KR',serif;font-size:2.4rem;font-weight:900;color:var(--green);line-height:1}
+.stat-unit{font-size:.95rem;color:var(--green-mid);font-weight:700}
+.stat-label{font-size:.82rem;color:var(--text-soft);margin-top:8px;line-height:1.5}
 
-  /* ── 훈련 카드 5개 ── */
-  .cards{display:grid;gap:14px;grid-template-columns:1fr;}
-  @media(min-width:560px){.cards{grid-template-columns:1fr 1fr;}}
-  .card{
-    background:var(--card);border-radius:14px;
-    padding:22px 22px 20px;
-    border:1.5px solid #e4f0e8;
-    display:flex;align-items:flex-start;gap:14px;
-  }
-  .card-icon{font-size:32px;line-height:1;flex-shrink:0;margin-top:2px;}
-  .card h3{font-size:18px;font-weight:800;color:var(--green-dark);margin-bottom:5px;}
-  .card p{font-size:14px;color:var(--muted);line-height:1.55;}
+/* SECTIONS */
+.section{padding:72px 5%}
+.section-alt{background:#fff}
+.inner{max-width:1100px;margin:0 auto}
+.section-title{text-align:center;margin-bottom:52px}
+.section-title .label{display:inline-block;color:var(--green);font-size:.8rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin-bottom:10px}
+.section-title h2{font-family:'Noto Serif KR',serif;font-size:clamp(1.6rem,3.5vw,2.2rem);font-weight:900;color:var(--text);line-height:1.3}
+.section-title p{color:var(--text-soft);font-size:1rem;margin-top:12px;max-width:560px;margin-left:auto;margin-right:auto}
 
-  /* ── 앱 선택 섹션 ── */
-  #choose{background:#fff;border-top:1px solid #e4f0e8;border-bottom:1px solid #e4f0e8;}
-  .choose-grid{
-    display:grid;gap:20px;
-    grid-template-columns:1fr;
-  }
-  @media(min-width:560px){.choose-grid{grid-template-columns:1fr 1fr;}}
-  .choose-card{
-    border-radius:16px;padding:32px 28px;text-align:center;
-    text-decoration:none;display:block;
-    transition:transform .15s,box-shadow .15s;
-    border:2px solid transparent;
-  }
-  .choose-card:hover{transform:translateY(-3px);}
-  .choose-kor{
-    background:linear-gradient(145deg,#e8faf0,#d0f5de);
-    border-color:#a8e6bc;
-  }
-  .choose-en{
-    background:linear-gradient(145deg,#e8f1fd,#d0e6fb);
-    border-color:#a8c8f5;
-  }
-  .choose-card .c-icon{font-size:48px;margin-bottom:12px;display:block;}
-  .choose-card h3{
-    font-size:clamp(20px,4vw,26px);font-weight:900;
-    margin-bottom:8px;
-  }
-  .choose-kor h3{color:var(--green-dark);}
-  .choose-en h3{color:#1a4a8a;}
-  .choose-card p{font-size:14px;color:var(--muted);margin-bottom:20px;line-height:1.55;}
-  .c-btn{
-    display:inline-block;padding:13px 28px;border-radius:10px;
-    font-size:17px;font-weight:800;text-decoration:none;
-    transition:opacity .15s;
-  }
-  .c-btn:hover{opacity:.88;}
-  .choose-kor .c-btn{background:var(--green);color:#fff;}
-  .choose-en  .c-btn{background:var(--blue);color:#fff;}
+/* TRAINING CARDS */
+.train-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px}
+.train-card{background:var(--green-light);border:1.5px solid #c8e6d0;border-radius:var(--r);padding:28px 20px;text-align:center;transition:all .25s}
+.train-card:hover{transform:translateY(-5px);box-shadow:var(--shadow);border-color:var(--green-mid)}
+.train-icon{font-size:2.4rem;margin-bottom:14px}
+.train-card h3{font-family:'Noto Serif KR',serif;font-size:1.05rem;font-weight:700;color:var(--green-dark);margin-bottom:8px}
+.train-card p{font-size:.85rem;color:var(--text-mid);line-height:1.65}
+.train-badge{display:inline-block;margin-top:12px;background:var(--green);color:#fff;font-size:.72rem;padding:3px 12px;border-radius:12px}
 
-  /* ── 영어훈련 설명 ── */
-  #en-desc{background:var(--bg);}
-  .mode-list{display:grid;gap:12px;}
-  .mode-item{
-    background:#fff;border-radius:12px;
-    padding:18px 20px;
-    border-left:4px solid var(--blue);
-    display:flex;gap:14px;align-items:flex-start;
-  }
-  .mode-badge{
-    background:var(--blue);color:#fff;
-    font-size:13px;font-weight:700;
-    padding:3px 10px;border-radius:20px;
-    white-space:nowrap;flex-shrink:0;margin-top:2px;
-  }
-  .mode-item p{font-size:14px;color:var(--muted);line-height:1.55;}
-  .mode-item strong{color:var(--text);display:block;margin-bottom:3px;font-size:15px;}
+/* APP SELECTION */
+.app-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:28px}
+.app-card{border-radius:var(--r);padding:40px 32px;text-align:center;border:2px solid transparent;transition:all .2s}
+.app-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-lg)}
+.app-card-kor{background:linear-gradient(145deg,#e8faf0,#d0f5de);border-color:#a8e6bc}
+.app-card-en{background:linear-gradient(145deg,#e8f1fd,#d0e6fb);border-color:#a8c8f5}
+.app-card .c-icon{font-size:52px;margin-bottom:16px;display:block}
+.app-card h3{font-family:'Noto Serif KR',serif;font-size:1.5rem;font-weight:900;margin-bottom:10px}
+.app-card-kor h3{color:var(--green-dark)}
+.app-card-en h3{color:#1a4a8a}
+.app-card p{font-size:.9rem;color:var(--text-mid);line-height:1.7;margin-bottom:20px}
+.app-card ul{text-align:left;list-style:none;margin:0 auto 24px;display:inline-block}
+.app-card ul li{font-size:.85rem;color:var(--text-mid);padding:3px 0}
+.app-card ul li::before{content:'✓ ';color:var(--green);font-weight:700}
+.app-card-en ul li::before{color:var(--blue)}
+.c-btn{display:inline-block;padding:14px 36px;border-radius:50px;font-size:1rem;font-weight:800;text-decoration:none;transition:opacity .15s;border:none;cursor:pointer;font-family:inherit}
+.c-btn:hover{opacity:.88}
+.app-card-kor .c-btn{background:var(--green);color:#fff}
+.app-card-en .c-btn{background:var(--blue);color:#fff}
 
-  /* ── 하단 ── */
-  footer{
-    text-align:center;padding:36px 20px;
-    font-size:13px;color:#aaa;
-    border-top:1px solid #e4f0e8;
-  }
-  .exit-btn{
-    display:inline-block;margin-top:20px;
-    padding:10px 28px;border-radius:8px;
-    background:#f0f0f0;color:#888;
-    font-size:14px;font-weight:600;text-decoration:none;
-    border:none;cursor:pointer;
-  }
-  .exit-btn:hover{background:#e4e4e4;}
+/* EN MODES */
+.en-modes{display:grid;gap:14px}
+.en-mode{background:#fff;border-radius:12px;padding:20px 24px;border-left:4px solid var(--blue);display:flex;gap:16px;align-items:flex-start}
+.en-badge{background:var(--blue);color:#fff;font-size:.78rem;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap;flex-shrink:0;margin-top:2px}
+.en-mode strong{display:block;font-size:1rem;color:var(--text);margin-bottom:4px;font-weight:700}
+.en-mode p{font-size:.88rem;color:var(--text-soft);line-height:1.65}
 
-  /* ── 공통 구분선 ── */
-  .divider{width:48px;height:4px;background:var(--green);border-radius:2px;margin-bottom:24px;}
+/* BLOG ARTICLES */
+.article-grid{display:grid;gap:32px}
+.article-card{background:#fff;border-radius:var(--r);border:1px solid var(--border);overflow:hidden;transition:all .25s}
+.article-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-3px)}
+.article-head{padding:28px 28px 0}
+.article-tag{font-size:.75rem;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.article-head h3{font-family:'Noto Serif KR',serif;font-size:1.2rem;font-weight:700;color:var(--text);margin-bottom:0;line-height:1.4}
+.article-body{padding:16px 28px 28px;font-size:.9rem;color:var(--text-mid);line-height:1.85}
+.article-body p{margin-bottom:14px}
+.article-body p:last-child{margin-bottom:0}
+.article-meta{display:flex;gap:14px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);font-size:.78rem;color:var(--text-soft)}
+
+/* HOW TO */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px}
+.step-card{background:#fff;border-radius:var(--r);padding:28px 22px;border:1px solid var(--border);transition:all .25s}
+.step-card:hover{box-shadow:var(--shadow)}
+.step-num{width:44px;height:44px;background:var(--green);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Noto Serif KR',serif;font-weight:900;font-size:1.2rem;margin-bottom:16px}
+.step-card h3{font-size:1rem;font-weight:700;color:var(--green-dark);margin-bottom:8px}
+.step-card p{font-size:.85rem;color:var(--text-mid);line-height:1.65}
+
+/* FAQ */
+.faq-list{display:grid;border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.faq-item{border-bottom:1px solid var(--border)}
+.faq-item:last-child{border-bottom:none}
+.faq-q{padding:20px 24px;font-weight:700;font-size:.95rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:#fff;color:var(--text);transition:background .2s;gap:12px}
+.faq-q:hover{background:var(--green-light)}
+.faq-q::after{content:'＋';font-size:1.3rem;color:var(--green);transition:transform .3s;flex-shrink:0}
+.faq-item.open .faq-q{background:var(--green-light);color:var(--green-dark)}
+.faq-item.open .faq-q::after{transform:rotate(45deg)}
+.faq-a{display:none;padding:0 24px 20px;font-size:.9rem;color:var(--text-mid);line-height:1.8;background:var(--green-light)}
+.faq-item.open .faq-a{display:block}
+
+/* BOARD */
+.board-write{background:#fff;border-radius:var(--r);border:1px solid var(--border);padding:24px;margin-bottom:24px}
+.board-write h4{font-size:1rem;font-weight:700;color:var(--green-dark);margin-bottom:16px}
+.board-input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:.9rem;margin-bottom:10px;transition:border-color .2s;color:var(--text)}
+.board-input:focus{outline:none;border-color:var(--green)}
+.board-textarea{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:.9rem;resize:vertical;min-height:110px;margin-bottom:10px;transition:border-color .2s;color:var(--text)}
+.board-textarea:focus{outline:none;border-color:var(--green)}
+.btn-submit{background:var(--green);color:#fff;border:none;padding:11px 28px;border-radius:var(--r-sm);font-weight:700;font-size:.9rem;cursor:pointer;transition:all .2s;font-family:inherit}
+.btn-submit:hover{background:var(--green-dark)}
+.board-msg{font-size:.85rem;margin-top:8px;min-height:20px}
+.board-msg.ok{color:var(--green)}
+.board-msg.err{color:#e53935}
+.post-item{background:#fff;padding:18px 20px;border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:10px}
+.post-item.notice{background:var(--accent-light);border-color:#f0c060}
+.post-header{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.post-name{font-weight:700;font-size:.9rem;color:var(--text)}
+.post-date{font-size:.78rem;color:var(--text-soft);margin-left:auto}
+.notice-badge{background:var(--accent);color:#fff;font-size:.72rem;padding:2px 10px;border-radius:10px;font-weight:700}
+.post-body{font-size:.88rem;color:var(--text-mid);line-height:1.7;white-space:pre-wrap;word-break:break-word}
+.admin-reply{margin-top:12px;padding:12px 14px;background:var(--green-light);border-radius:var(--r-sm);border-left:3px solid var(--green)}
+.admin-reply-label{font-size:.75rem;font-weight:700;color:var(--green-dark);margin-bottom:4px}
+.admin-reply-text{font-size:.85rem;color:var(--text-mid);line-height:1.65;white-space:pre-wrap}
+.no-post{text-align:center;padding:32px;color:var(--text-soft);font-size:.9rem}
+.reply-form{display:none;margin-top:10px}
+.reply-form.open{display:block}
+.reply-textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--r-sm);font-size:.88rem;resize:vertical;min-height:80px;font-family:inherit}
+.btn-reply-toggle{background:transparent;border:1.5px solid var(--green);color:var(--green);padding:5px 14px;border-radius:6px;font-size:.78rem;cursor:pointer;font-family:inherit}
+.btn-reply-submit{background:var(--green);color:#fff;border:none;padding:7px 18px;border-radius:6px;font-size:.82rem;cursor:pointer;font-family:inherit}
+.btn-delete{background:transparent;border:1.5px solid #e53935;color:#e53935;padding:5px 14px;border-radius:6px;font-size:.78rem;cursor:pointer;font-family:inherit}
+.notice-write-area{display:none;background:var(--accent-light);border:1.5px dashed var(--accent);border-radius:var(--r-sm);padding:16px;margin-bottom:16px}
+.notice-write-area h4{font-size:.9rem;font-weight:700;margin-bottom:10px;color:#b8860b}
+.notice-input{width:100%;padding:8px 12px;border:1.5px solid #f0c060;border-radius:6px;font-size:.88rem;margin-bottom:8px;font-family:inherit}
+.btn-notice-submit{background:var(--accent);color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:.85rem;cursor:pointer;font-family:inherit}
+
+/* CTA */
+.cta{background:linear-gradient(135deg,var(--green-dark),var(--green));color:#fff;padding:72px 5%;text-align:center}
+.cta h2{font-family:'Noto Serif KR',serif;font-size:clamp(1.6rem,3.5vw,2.2rem);font-weight:900;margin-bottom:14px;line-height:1.3}
+.cta p{font-size:1rem;opacity:.9;margin-bottom:32px}
+.btn-cta{display:inline-block;background:#fff;color:var(--green-dark);font-weight:800;font-size:1.05rem;padding:15px 40px;border-radius:50px;transition:all .2s;box-shadow:0 4px 20px rgba(0,0,0,.2)}
+.btn-cta:hover{transform:translateY(-3px)}
+
+/* FOOTER */
+footer{background:var(--green-dark);color:rgba(255,255,255,.8);padding:56px 5% 32px}
+.footer-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px;margin-bottom:40px}
+.footer-brand p{font-size:.85rem;line-height:1.7;opacity:.75;margin-top:12px}
+.footer-col h4{font-size:.88rem;font-weight:700;color:#fff;margin-bottom:14px;text-transform:uppercase;letter-spacing:.06em}
+.footer-col ul{list-style:none}
+.footer-col li{margin-bottom:8px}
+.footer-col a{font-size:.83rem;color:rgba(255,255,255,.65);transition:color .2s}
+.footer-col a:hover{color:#fff}
+.footer-bottom{border-top:1px solid rgba(255,255,255,.15);padding-top:24px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px}
+.footer-copy{font-size:.8rem;opacity:.55}
+.footer-disclaimer{font-size:.75rem;opacity:.5;max-width:480px;line-height:1.5}
+
+/* SCROLL ANIMATION */
+.fade-up{opacity:0;transform:translateY(24px);transition:opacity .6s ease,transform .6s ease}
+.fade-up.visible{opacity:1;transform:none}
+
+@media(max-width:900px){
+  nav{gap:10px}
+  .footer-inner{grid-template-columns:1fr 1fr}
+  .stats-inner{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:640px){
+  .header-inner{height:56px}
+  nav a:not(.btn-start){display:none}
+  .hero{padding:60px 4% 70px}
+  .footer-inner{grid-template-columns:1fr}
+  .footer-bottom{flex-direction:column}
+}
 </style>
 </head>
 <body>
 
-<!-- ── 헤더 ── -->
+<!-- HEADER -->
 <header>
-  <div class="logo">JS Brain Training</div>
-  <h1>JS <span>두뇌훈련</span></h1>
-  <p class="sub">매일 5분, 뇌를 깨워요<br>시력강화 · 집중력 · 기억력 · 문장기억 · 독서능력</p>
-  <div class="hero-btns">
-    <a href="./kor/" class="btn-hero btn-kor">
-      <span class="btn-icon">🧠</span> 한글 훈련 시작
-    </a>
-    <a href="./kor/app_en.html" class="btn-hero btn-en">
-      <span class="btn-icon">🌏</span> 영어 훈련 시작
-    </a>
+  <div class="header-inner">
+    <div class="logo">🧠 <span class="logo-badge">JS</span> 두뇌훈련</div>
+    <nav>
+      <a href="#training">훈련 소개</a>
+      <a href="#choose">앱 선택</a>
+      <a href="#blog">두뇌 건강 정보</a>
+      <a href="#faq">FAQ</a>
+      <a href="#board">커뮤니티</a>
+      <a href="/kor/app.html" class="btn-start">▶ 훈련 시작</a>
+    </nav>
   </div>
 </header>
 
-<!-- ── 훈련 소개 ── -->
-<section id="features">
-  <div class="inner">
-    <div class="sec-label">5가지 훈련</div>
-    <h2>뇌의 다섯 가지 능력을<br>매일 단련합니다</h2>
-    <p class="lead">각 훈련은 3~10분 내외로 구성되어 있으며,<br>어르신도 쉽고 즐겁게 참여할 수 있습니다.</p>
-    <div class="cards">
-      <div class="card">
-        <div class="card-icon">👁</div>
-        <div>
-          <h3>시력강화 훈련</h3>
-          <p>빠르게 이동하는 도형을 눈으로 따라가며 안구 근육을 자연스럽게 단련합니다. 가로·세로·랜덤 3단계로 진행됩니다.</p>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-icon">🎯</div>
-        <div>
-          <h3>집중력 훈련</h3>
-          <p>화면을 가득 채운 낱말 속에서 연달아 반복되는 낱말을 찾아냅니다. 수준이 높아질수록 반복 낱말의 수가 늘어납니다.</p>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-icon">💡</div>
-        <div>
-          <h3>기억력 훈련</h3>
-          <p>순서대로 등장하는 낱말들을 기억했다가 훈련 후 적어봅니다. 낱말 수와 속도를 조절하며 도전합니다.</p>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-icon">📝</div>
-        <div>
-          <h3>문장기억 훈련</h3>
-          <p>여러 문장을 읽고 기억한 뒤, 특정 낱말이 몇 번째 문장에 나왔는지 맞힙니다. 독해력과 단기 기억을 동시에 훈련합니다.</p>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-icon">📖</div>
-        <div>
-          <h3>독서능력 향상</h3>
-          <p>본문을 빠르게 읽고 내용을 이해하는 속독 훈련입니다. 읽기 후 퀴즈로 이해도를 확인합니다.</p>
-        </div>
-      </div>
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-badge">✅ 완전 무료 · 앱 설치 불필요 · 어르신 맞춤 설계</div>
+    <h1>두뇌가 젊어지는 <em>매일 5분</em>,<br>오늘부터 시작하세요</h1>
+    <p class="hero-sub">시력강화·집중력·기억력·문장기억·독서능력<br>5가지 과학적 두뇌 훈련으로 인지 기능을 향상시키세요</p>
+    <div class="hero-btns">
+      <a href="/kor/app.html" class="btn-hero btn-kor">🇰🇷 한글 훈련 시작</a>
+      <a href="/kor/app_en.html" class="btn-hero btn-en">🌏 영어 훈련 시작</a>
+    </div>
+    <div class="hero-tags">
+      <span>🧠 치매 예방</span>
+      <span>👁️ 시력 강화</span>
+      <span>💡 집중력 향상</span>
+      <span>🎯 기억력 강화</span>
+      <span>📚 독서 속도 향상</span>
+      <span>🌏 한글·영어 동시 학습</span>
     </div>
   </div>
 </section>
 
-<!-- ── 앱 선택 ── -->
-<section id="choose">
-  <div class="inner">
-    <div class="sec-label">훈련 선택</div>
-    <h2>두 가지 훈련 중<br>원하는 것을 선택하세요</h2>
-    <div class="divider"></div>
-    <div class="choose-grid">
+<!-- STATS -->
+<div class="stats">
+  <div class="stats-inner">
+    <div class="stat-item fade-up"><div><span class="stat-num">5</span><span class="stat-unit">가지</span></div><div class="stat-label">두뇌 훈련 모드<br>한 번에 해결</div></div>
+    <div class="stat-item fade-up"><div><span class="stat-num">2</span><span class="stat-unit">주</span></div><div class="stat-label">꾸준히 하면<br>집중력 변화 체감</div></div>
+    <div class="stat-item fade-up"><div><span class="stat-num">2</span><span class="stat-unit">개</span></div><div class="stat-label">한글·영어 훈련<br>선택 가능</div></div>
+    <div class="stat-item fade-up"><div><span class="stat-num">100</span><span class="stat-unit">%</span></div><div class="stat-label">완전 무료<br>설치 불필요</div></div>
+  </div>
+</div>
 
-      <!-- 한글 훈련 -->
-      <a href="./kor/" class="choose-card choose-kor">
+<!-- TRAINING INTRO -->
+<section class="section section-alt" id="training">
+  <div class="inner">
+    <div class="section-title">
+      <div class="label">5가지 두뇌 훈련</div>
+      <h2>과학적으로 설계된<br>두뇌 강화 프로그램</h2>
+      <p>각 훈련은 뇌의 서로 다른 영역을 자극하여 종합적인 인지 기능 향상을 돕습니다</p>
+    </div>
+    <div class="train-grid">
+      <div class="train-card fade-up"><div class="train-icon">👁️</div><h3>시력강화 훈련</h3><p>격자 위를 이동하는 도형을 눈으로 추적하며 안구 근육을 단련하고 시야를 확장합니다. 가로·세로·랜덤 3단계로 구성됩니다.</p><span class="train-badge">준비 운동</span></div>
+      <div class="train-card fade-up"><div class="train-icon">🎯</div><h3>집중력 훈련</h3><p>화면을 가득 채운 낱말 속에서 연달아 반복되는 낱말을 찾아냅니다. 순간 인식력과 선택적 주의력을 키웁니다.</p><span class="train-badge">핵심 훈련</span></div>
+      <div class="train-card fade-up"><div class="train-icon">🧠</div><h3>기억력 훈련</h3><p>순서대로 등장하는 낱말들을 기억했다가 훈련 후 적어봅니다. 단기 기억력과 작업 기억을 강화합니다.</p><span class="train-badge">핵심 훈련</span></div>
+      <div class="train-card fade-up"><div class="train-icon">📝</div><h3>문장기억 훈련</h3><p>여러 문장을 읽고 특정 낱말이 몇 번째 문장에 나왔는지 맞힙니다. 독해력과 문맥 파악 능력을 향상시킵니다.</p><span class="train-badge">심화 훈련</span></div>
+      <div class="train-card fade-up"><div class="train-icon">📖</div><h3>독서능력 향상</h3><p>장문을 빠르게 읽고 내용 이해도를 퀴즈로 확인합니다. 독서 속도와 이해력을 함께 높이는 속독 훈련입니다.</p><span class="train-badge">독해 훈련</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- APP CHOICE -->
+<section class="section" id="choose">
+  <div class="inner">
+    <div class="section-title">
+      <div class="label">훈련 선택</div>
+      <h2>한글 훈련과 영어 훈련,<br>원하는 것을 선택하세요</h2>
+      <p>같은 5가지 훈련을, 한글과 영어 두 가지 방식으로 즐길 수 있습니다</p>
+    </div>
+    <div class="app-grid">
+      <div class="app-card app-card-kor">
         <span class="c-icon">🇰🇷</span>
         <h3>한글 훈련</h3>
-        <p>순수 한글 낱말과 문장으로 진행하는 두뇌훈련입니다. 시력강화 · 집중력 · 기억력 · 문장기억 · 독서 모든 훈련을 한글로 즐기세요.</p>
-        <span class="c-btn">한글 훈련 가기 →</span>
-      </a>
-
-      <!-- 영어 훈련 -->
-      <a href="./kor/app_en.html" class="choose-card choose-en">
+        <p>순수 한글 낱말과 문장으로 진행하는 두뇌훈련입니다. 어르신도 쉽게 따라할 수 있는 친숙한 우리말 중심의 훈련 프로그램입니다.</p>
+        <ul>
+          <li>시력강화 · 집중력 · 기억력 훈련</li>
+          <li>문장기억 · 독서능력향상 훈련</li>
+          <li>수준 1·2·3 단계별 조절</li>
+          <li>성경 데이터팩 등 확장 콘텐츠 지원</li>
+        </ul>
+        <a href="/kor/app.html" class="c-btn">한글 훈련 시작하기 →</a>
+      </div>
+      <div class="app-card app-card-en">
         <span class="c-icon">🌏</span>
         <h3>영어 훈련</h3>
-        <p>한글과 영어가 함께 나오는 두뇌훈련입니다. 익숙한 한글 의미와 함께 영어 단어와 문장을 자연스럽게 익힙니다.</p>
-        <span class="c-btn">영어 훈련 가기 →</span>
-      </a>
-
+        <p>한글과 영어가 함께 등장하는 두뇌 훈련입니다. 익숙한 한글 의미와 함께 영어를 자연스럽게 익히며 두뇌를 단련합니다.</p>
+        <ul>
+          <li>한글·영어 교대 출력 집중력 훈련</li>
+          <li>한글+영어 쌍으로 기억하는 기억력 훈련</li>
+          <li>한글 문장 + 영어 번역 문장기억 훈련</li>
+          <li>한글 본문 → 영어 본문 → 영어 퀴즈</li>
+        </ul>
+        <a href="/kor/app_en.html" class="c-btn">영어 훈련 시작하기 →</a>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ── 영어훈련 상세 설명 ── -->
-<section id="en-desc">
+<!-- ENGLISH DETAIL -->
+<section class="section section-alt">
   <div class="inner">
-    <div class="sec-label">영어 훈련 안내</div>
-    <h2>영어 훈련은<br>이렇게 진행됩니다</h2>
-    <p class="lead">모든 화면 안내는 한글로 표시됩니다.<br>영어는 훈련 데이터에서만 등장합니다.</p>
-    <div class="mode-list">
-      <div class="mode-item">
-        <span class="mode-badge">시력강화</span>
-        <div><strong>기존 방식과 동일</strong><p>도형과 이미지로 진행되어 언어와 무관합니다.</p></div>
-      </div>
-      <div class="mode-item">
-        <span class="mode-badge">집중력</span>
-        <div><strong>한글 → 영어 교대 출력</strong><p>고양이 → Cat → 개 → Dog 순서로 교대 출력됩니다. 동일한 한글·영어 쌍이 연달아 두 번 나오면 카운트합니다.</p></div>
-      </div>
-      <div class="mode-item">
-        <span class="mode-badge">기억력</span>
-        <div><strong>한글+영어 한 세트</strong><p>낱말 한 개가 한글과 영어로 함께 표시됩니다. 두 언어를 하나의 단위로 기억합니다.</p></div>
-      </div>
-      <div class="mode-item">
-        <span class="mode-badge">문장기억</span>
-        <div><strong>한글 문장 + 영어 번역 2행 구성</strong><p>슬롯 한 칸에 한글 문장과 영어 번역이 함께 표시됩니다. 의미를 연결해 기억력을 높입니다.</p></div>
-      </div>
-      <div class="mode-item">
-        <span class="mode-badge">독서능력</span>
-        <div><strong>한글 본문 → 5초 휴식 → 영어 본문 → 영어 퀴즈</strong><p>한글로 먼저 내용을 파악한 뒤, 영어 본문을 읽고 영어 퀴즈 5문제를 풉니다.</p></div>
-      </div>
+    <div class="section-title">
+      <div class="label">영어 훈련 안내</div>
+      <h2>영어 훈련은<br>이렇게 다릅니다</h2>
+      <p>모든 화면 안내는 한글로 표시됩니다. 영어는 오직 훈련 데이터에서만 등장합니다.</p>
+    </div>
+    <div class="en-modes">
+      <div class="en-mode fade-up"><span class="en-badge">시력강화</span><div><strong>기존 방식 그대로</strong><p>도형과 이미지로 진행되어 언어와 무관합니다. 두 앱에서 동일하게 즐길 수 있습니다.</p></div></div>
+      <div class="en-mode fade-up"><span class="en-badge">집중력</span><div><strong>한글 → 영어 교대 출력</strong><p>"고양이 → Cat → 개 → Dog" 순서로 한글과 영어가 교대로 표시됩니다. 동일한 의미의 한글·영어 쌍이 연달아 두 번 나오면 집중력 포인트로 카운트됩니다.</p></div></div>
+      <div class="en-mode fade-up"><span class="en-badge">기억력</span><div><strong>한글 + 영어 한 세트</strong><p>낱말 하나가 한글과 영어로 함께 표시됩니다. 두 언어를 하나의 단위로 기억하며 영어 단어를 자연스럽게 습득합니다.</p></div></div>
+      <div class="en-mode fade-up"><span class="en-badge">문장기억</span><div><strong>한글 문장 + 영어 번역 2행 구성</strong><p>슬롯 한 칸에 한글 문장과 영어 번역이 나란히 표시됩니다. 의미를 연결해 기억하여 기억력과 영어 이해력을 동시에 키웁니다.</p></div></div>
+      <div class="en-mode fade-up"><span class="en-badge">독서능력</span><div><strong>한글 본문 → 5초 휴식 → 영어 본문 → 영어 퀴즈</strong><p>먼저 한글 본문을 읽어 내용을 파악한 후, 영어 번역 본문을 읽습니다. 마지막으로 영어로 출제된 퀴즈 5문제를 풀어 이해도를 확인합니다.</p></div></div>
     </div>
   </div>
 </section>
 
-<!-- ── 하단 푸터 ── -->
+<!-- BLOG -->
+<section class="section" id="blog">
+  <div class="inner">
+    <div class="section-title">
+      <div class="label">두뇌 건강 정보</div>
+      <h2>시니어 두뇌 건강,<br>꼭 알아야 할 정보</h2>
+      <p>치매 예방부터 기억력 향상까지, 두뇌 건강을 위한 유익한 정보를 제공합니다</p>
+    </div>
+    <div class="article-grid">
+
+      <div class="article-card fade-up">
+        <div class="article-head"><div class="article-tag">🧠 치매 예방</div><h3>치매를 예방하는 7가지 두뇌 훈련 방법</h3></div>
+        <div class="article-body">
+          <p>65세 이상 노인 10명 중 1명이 치매를 앓고 있는 것으로 알려져 있습니다. 치매는 아직 완치 방법이 없지만, 꾸준한 두뇌 훈련으로 발병 위험을 최대 35%까지 줄일 수 있다는 연구 결과가 있습니다.</p>
+          <p><strong>첫째, 매일 새로운 것을 배우세요.</strong> 뇌는 새로운 정보를 받아들일 때 가장 활발하게 활동합니다. 언어 배우기, 악기 연주, 새로운 취미 활동은 뇌의 신경 연결을 강화합니다. <strong>둘째, 규칙적인 독서 습관을 기르세요.</strong> 책을 읽는 행위는 이해력·상상력·집중력을 동시에 사용하는 복합 두뇌 운동입니다. <strong>셋째, 퍼즐과 게임을 즐기세요.</strong> 바둑, 장기, 퍼즐은 논리적 사고와 기억력을 자극합니다.</p>
+          <p><strong>넷째, 사회적 활동을 유지하세요.</strong> 가족·친구와 대화를 자주 나누면 언어 중추와 감정 조절 능력이 함께 자극됩니다. <strong>다섯째, 디지털 두뇌 훈련을 활용하세요.</strong> JS 두뇌훈련은 언제 어디서나 스마트폰으로 두뇌를 단련할 수 있는 5가지 훈련을 제공합니다. <strong>여섯째, 규칙적인 신체 운동을 병행하세요.</strong> 걷기·수영 등의 유산소 운동은 뇌 혈류를 증가시켜 인지 기능 유지에 도움이 됩니다. <strong>일곱째, 충분한 수면을 취하세요.</strong> 수면 중 뇌는 낮에 쌓인 노폐물을 제거하고 기억을 정리합니다. 하루 7~8시간의 숙면이 두뇌 건강의 기본입니다.</p>
+          <div class="article-meta"><span>📅 두뇌 건강</span><span>⏱ 약 3분 소요</span></div>
+        </div>
+      </div>
+
+      <div class="article-card fade-up">
+        <div class="article-head"><div class="article-tag">💡 기억력 과학</div><h3>60세 이후 기억력 저하, 원인과 대처 방법</h3></div>
+        <div class="article-body">
+          <p>나이가 들수록 "아까 뭘 하러 왔더라?", "그 사람 이름이 뭐였지?" 하는 순간이 잦아집니다. 이는 자연스러운 노화 현상이지만, 방치하면 경도 인지 장애나 치매로 이어질 수 있습니다.</p>
+          <p><strong>왜 나이가 들면 기억력이 줄어드나요?</strong> 뇌 속의 신경 전달 속도가 느려지고, 기억을 관장하는 해마의 크기가 매년 약 1%씩 줄어들기 때문입니다. 또한 수면의 질 저하, 만성 스트레스, 운동 부족, 사회적 고립도 기억력 감소를 가속합니다.</p>
+          <p><strong>효과적인 기억력 유지 방법</strong>을 소개합니다. 첫째, 반복 학습이 핵심입니다. 같은 정보를 여러 번 다른 방식으로 접하면 장기 기억으로 전환됩니다. 기억력 훈련 앱을 이용해 매일 조금씩 연습하는 것이 가장 효과적입니다. 둘째, 감각을 다양하게 활용하세요. 보고, 듣고, 직접 써보면 기억에 더 오래 남습니다. 셋째, 스트레스 관리가 중요합니다. 코르티솔(스트레스 호르몬)은 해마를 손상시킵니다. 명상, 산책, 심호흡 등으로 스트레스를 줄이세요.</p>
+          <div class="article-meta"><span>📅 기억력</span><span>⏱ 약 3분 소요</span></div>
+        </div>
+      </div>
+
+      <div class="article-card fade-up">
+        <div class="article-head"><div class="article-tag">📚 속독 훈련</div><h3>독서 속도를 높이는 속독 훈련의 원리</h3></div>
+        <div class="article-body">
+          <p>한국 성인의 평균 독서 속도는 분당 200~300자 수준입니다. 꾸준한 속독 훈련을 통해 이해력을 유지하면서 속도를 두 배 이상 높일 수 있습니다. 독서 속도가 빨라지면 같은 시간에 더 많은 정보를 습득하고, 집중력과 이해력도 함께 향상됩니다.</p>
+          <p><strong>속독의 핵심 원리</strong>는 '눈의 이동 방식'을 바꾸는 것입니다. 일반적인 독서에서는 한 글자씩 눈이 멈추지만, 속독에서는 시선이 여러 글자를 한꺼번에 처리합니다. 이를 위해서는 시야각(인식 범위)을 넓히는 훈련이 필요합니다.</p>
+          <p><strong>JS 두뇌훈련의 독서능력 향상 모드</strong>는 바로 이 원리를 활용합니다. 페이지마다 제한 시간 안에 본문을 읽고, 이해도 퀴즈를 통해 읽기 능력을 확인합니다. 처음에는 수준 1(가장 느린 속도)부터 시작하여 점차 속도를 높여 나가는 것을 권장합니다.</p>
+          <div class="article-meta"><span>📅 독서 능력</span><span>⏱ 약 3분 소요</span></div>
+        </div>
+      </div>
+
+      <div class="article-card fade-up">
+        <div class="article-head"><div class="article-tag">🎯 집중력 향상</div><h3>스마트폰 시대에 집중력을 지키는 5가지 습관</h3></div>
+        <div class="article-body">
+          <p>현대인의 평균 집중 지속 시간은 점점 짧아지고 있습니다. 스마트폰 알림, SNS, 동영상의 홍수 속에서 집중력을 유지하기가 점점 어려워지고 있습니다. 특히 어르신들께는 집중력 저하가 일상생활의 불편함으로 직결되기도 합니다.</p>
+          <p><strong>집중력을 되찾는 5가지 실천법</strong>입니다. 첫째, 포모도로 기법을 활용하세요. 25분 집중 후 5분 휴식을 반복하면 집중력을 효율적으로 유지할 수 있습니다. 둘째, 알림을 차단하세요. 훈련할 때는 스마트폰 알림을 모두 끄고 하나의 일에 집중하는 연습을 합니다. 셋째, 규칙적인 수면이 집중력의 기반입니다.</p>
+          <p>넷째, <strong>집중력 훈련 앱을 매일 활용하세요.</strong> JS 두뇌훈련의 집중력 모드는 화면에 쏟아지는 낱말 중에서 반복 등장하는 낱말을 찾아내는 훈련으로, 짧은 시간 안에 고도의 집중력을 요구합니다. 꾸준히 하면 일상에서도 집중 상태를 더 오래 유지할 수 있게 됩니다. 다섯째, 산책과 명상으로 뇌를 쉬게 해주세요. 집중력은 결국 뇌의 에너지 관리 문제입니다.</p>
+          <div class="article-meta"><span>📅 집중력</span><span>⏱ 약 3분 소요</span></div>
+        </div>
+      </div>
+
+      <div class="article-card fade-up">
+        <div class="article-head"><div class="article-tag">🌅 어르신 건강</div><h3>어르신을 위한 하루 두뇌 건강 루틴</h3></div>
+        <div class="article-body">
+          <p>신체 건강을 위해 매일 걷고 운동하듯, 뇌도 매일 꾸준한 자극이 필요합니다. 특히 은퇴 후 사회적 활동이 줄어들수록 두뇌 자극이 감소하여 인지 기능이 더 빠르게 저하될 수 있습니다.</p>
+          <p><strong>아침:</strong> 기상 후 10분, 어제 있었던 일 세 가지를 떠올리며 일기를 씁니다. 글쓰기는 언어 능력과 기억력을 동시에 자극합니다. 식사 후에는 30분 산책으로 뇌 혈류를 활성화시킵니다.</p>
+          <p><strong>오전:</strong> JS 두뇌훈련 앱을 활용해 시력강화 → 집중력 → 기억력 훈련을 순서대로 진행합니다. 각 훈련은 1~3분 정도이며, 전체 훈련에 15~20분이 소요됩니다. <strong>오후:</strong> 독서나 문장기억 훈련으로 이해력과 기억력을 자극합니다. <strong>저녁:</strong> 가족과 대화를 나누거나 전화 통화를 하며 사회적 연결을 유지합니다. 사회적 상호작용은 두뇌 건강에 매우 중요합니다.</p>
+          <div class="article-meta"><span>📅 어르신 건강</span><span>⏱ 약 3분 소요</span></div>
+        </div>
+      </div>
+
+      <div class="article-card fade-up">
+        <div class="article-head"><div class="article-tag">🌏 영어 학습</div><h3>두뇌 훈련과 영어 학습, 동시에 해결하는 방법</h3></div>
+        <div class="article-body">
+          <p>영어 학습은 단순히 새로운 언어를 배우는 것을 넘어, 두뇌 건강에도 매우 긍정적인 영향을 미칩니다. 이중 언어를 구사하는 사람은 치매 발병 시기가 평균 4~5년 늦다는 연구 결과가 있습니다. 두 언어를 전환하며 사용하는 과정에서 뇌가 지속적으로 자극을 받기 때문입니다.</p>
+          <p><strong>JS 두뇌훈련 영어 훈련</strong>은 이 원리를 적극적으로 활용합니다. 한글과 영어를 교대로 출력하는 방식은 두 언어 체계를 동시에 활성화시켜, 일반적인 영어 학습과 두뇌 훈련 효과를 동시에 얻을 수 있습니다. 영어를 새로 배우기 시작하는 어르신도, 영어를 복습하고 싶은 분도 부담 없이 시작할 수 있습니다.</p>
+          <p>특히 영어 훈련의 <strong>집중력 모드</strong>는 "고양이 → Cat → 개 → Dog"처럼 한글과 영어를 교대로 보여주어, 자연스럽게 단어 의미를 매칭하며 기억하게 됩니다. 억지로 외우는 것이 아니라, 훈련을 반복하는 과정에서 저절로 영어 단어가 머릿속에 새겨지는 방식입니다.</p>
+          <div class="article-meta"><span>📅 영어 학습</span><span>⏱ 약 3분 소요</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- HOW TO -->
+<section class="section section-alt" id="howto">
+  <div class="inner">
+    <div class="section-title">
+      <div class="label">사용 방법</div>
+      <h2>4단계로 시작하는<br>두뇌 훈련</h2>
+    </div>
+    <div class="steps">
+      <div class="step-card fade-up"><div class="step-num">1</div><h3>훈련 선택</h3><p>한글 훈련 또는 영어 훈련 중 원하는 것을 선택하세요. 처음이라면 한글 훈련부터 시작하는 것을 추천합니다.</p></div>
+      <div class="step-card fade-up"><div class="step-num">2</div><h3>수준 설정</h3><p>처음이라면 수준 1부터 시작하세요. 80점 이상이 되면 수준을 높여 지속적으로 도전하세요.</p></div>
+      <div class="step-card fade-up"><div class="step-num">3</div><h3>매일 꾸준히</h3><p>5가지 훈련을 순서대로 진행하세요. 하루 10~20분, 2주만 꾸준히 하면 집중력과 기억력의 변화를 느끼실 수 있습니다.</p></div>
+      <div class="step-card fade-up"><div class="step-num">4</div><h3>기록 확인</h3><p>훈련 점수와 랭킹이 서버에 저장됩니다. 나의 성장 기록을 확인하고 다른 사용자들과 비교해보세요.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section" id="faq">
+  <div class="inner">
+    <div class="section-title">
+      <div class="label">자주 묻는 질문</div>
+      <h2>궁금한 점이 있으신가요?</h2>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item"><div class="faq-q">어떤 기기에서도 사용할 수 있나요?</div><div class="faq-a">스마트폰, 태블릿, PC 모두 사용 가능합니다. iOS Safari, Android Chrome, 데스크톱 Chrome/Edge 모두 지원합니다. 별도의 앱 설치 없이 브라우저에서 바로 이용하실 수 있습니다. 화면이 큰 태블릿이나 PC에서 더욱 쾌적하게 훈련할 수 있습니다.</div></div>
+      <div class="faq-item"><div class="faq-q">비용이 드나요? 완전 무료인가요?</div><div class="faq-a">기본 훈련 프로그램은 완전히 무료입니다. 추가 데이터팩(성경 확장팩 등)도 모두 무료로 제공됩니다. 회원 가입이나 개인 정보 입력 없이 이름(닉네임)만 등록하면 랭킹 기능을 이용하실 수 있습니다.</div></div>
+      <div class="faq-item"><div class="faq-q">점수와 랭킹은 어떻게 저장되나요?</div><div class="faq-a">이름(닉네임)을 등록하면 훈련 점수와 랭킹이 서버에 자동으로 저장됩니다. 한글 훈련과 영어 훈련의 랭킹은 같은 서버에서 통합 관리됩니다. 언제 어디서나 나의 훈련 기록을 확인하고 다른 사용자들과 비교하실 수 있습니다.</div></div>
+      <div class="faq-item"><div class="faq-q">어르신도 쉽게 사용할 수 있나요?</div><div class="faq-a">네, 어르신을 위해 특별히 설계된 프로그램입니다. 글자 크기가 충분히 크고, 버튼 조작이 단순하며, 훈련 속도를 자유롭게 조절할 수 있습니다. 수준을 1로 설정하면 누구나 쉽게 시작하실 수 있으며, 훈련 전 설명 화면을 통해 각 훈련 방법을 안내해 드립니다.</div></div>
+      <div class="faq-item"><div class="faq-q">어떤 순서로 훈련하는 것이 좋나요?</div><div class="faq-a">① 시력강화 → ② 집중력 → ③ 기억력 → ④ 문장기억 → ⑤ 독서능력 순서를 권장합니다. 시력강화 훈련으로 눈과 뇌를 깨운 후, 점차 난이도가 높아지는 훈련으로 자연스럽게 이어지는 구성입니다.</div></div>
+      <div class="faq-item"><div class="faq-q">영어 훈련은 영어를 전혀 모르는 분도 할 수 있나요?</div><div class="faq-a">네, 영어를 전혀 몰라도 괜찮습니다. 한글과 영어가 함께 표시되기 때문에, 한글 의미를 보면서 영어를 자연스럽게 접하게 됩니다. 억지로 외울 필요 없이, 반복되는 훈련 속에서 영어 단어가 자연스럽게 기억됩니다.</div></div>
+      <div class="faq-item"><div class="faq-q">데이터팩이란 무엇인가요?</div><div class="faq-a">데이터팩은 훈련에 사용되는 낱말과 문장 데이터를 확장하는 추가 콘텐츠입니다. 기본 내장 데이터 외에 성경 모세5경팩, 성경 4복음서팩 등 다양한 주제의 데이터팩을 무료로 다운로드하여 사용할 수 있습니다. 설정 화면의 데이터팩 탭에서 다운로드하실 수 있습니다.</div></div>
+      <div class="faq-item"><div class="faq-q">훈련 중 배경 음악을 끌 수 있나요?</div><div class="faq-a">네, 설정 화면의 환경설정 탭에서 시력강화 훈련 알파음, 낱말·문장 훈련 알파음을 각각 켜고 끌 수 있습니다. 배경 음악은 집중력 향상에 도움이 되는 알파파 음원입니다.</div></div>
+      <div class="faq-item"><div class="faq-q">두뇌 훈련이 치매 예방에 실제로 효과가 있나요?</div><div class="faq-a">여러 연구에 따르면 꾸준한 인지 활동이 치매 발병 위험을 낮추는 데 도움이 됩니다. 특히 집중력·기억력·독서 훈련은 두뇌의 인지 예비능(cognitive reserve)을 강화하여 노화에 따른 인지 기능 저하를 늦추는 데 기여할 수 있습니다. 다만 본 서비스는 의료 기기가 아니며, 의학적 치료를 대체하지 않습니다.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- COMMUNITY BOARD -->
+<section class="section section-alt" id="board">
+  <div class="inner">
+    <div class="section-title">
+      <div class="label">커뮤니티</div>
+      <h2>훈련 경험을<br>나눠주세요</h2>
+      <p>훈련 소감, 건강 정보, 궁금한 점을 자유롭게 남겨주세요. 관리자가 성실히 답변드립니다.</p>
+    </div>
+    <div class="board-write">
+      <h4>✏️ 글 남기기</h4>
+      <div id="notice-write-area" class="notice-write-area">
+        <h4>📌 공지 등록 (관리자 전용)</h4>
+        <input class="notice-input" id="notice-title" type="text" placeholder="공지 제목">
+        <textarea class="notice-input" id="notice-content" style="min-height:80px;" placeholder="공지 내용"></textarea>
+        <button class="btn-notice-submit" onclick="submitNotice()">공지 등록</button>
+      </div>
+      <input class="board-input" id="post-name" type="text" placeholder="이름 (닉네임, 최대 20자)" maxlength="20">
+      <textarea class="board-textarea" id="post-content" placeholder="훈련 소감이나 두뇌 건강 정보를 공유해주세요. (최대 500자)" maxlength="500"></textarea>
+      <button class="btn-submit" id="btn-post-submit" onclick="submitPost()">등록하기</button>
+      <div class="board-msg" id="board-msg"></div>
+    </div>
+    <div id="post-list"></div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <h2>오늘부터 시작하세요<br>뇌는 훈련할수록 강해집니다</h2>
+  <p>매일 꾸준한 두뇌 훈련으로 더 건강하고 활기찬 노후를 만들어가세요</p>
+  <a href="/kor/app.html" class="btn-cta">▶ 지금 무료로 시작하기</a>
+</section>
+
+<!-- FOOTER -->
 <footer>
-  <p>© 2025 JS 두뇌훈련 · 매일 꾸준히, 건강한 뇌를 만듭니다</p>
-  <p style="margin-top:6px;font-size:12px;">본 앱의 훈련은 의학적 치료를 대체하지 않습니다.</p>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="logo" style="color:#fff;margin-bottom:0">🧠 <span class="logo-badge">JS</span> 두뇌훈련</div>
+      <p>어르신을 위한 무료 두뇌 훈련 프로그램. 시력강화·집중력·기억력·문장기억·독서능력 향상과 한글·영어 동시 학습을 지원합니다.</p>
+    </div>
+    <div class="footer-col">
+      <h4>훈련</h4>
+      <ul>
+        <li><a href="/kor/app.html">한글 훈련 시작</a></li>
+        <li><a href="/kor/app_en.html">영어 훈련 시작</a></li>
+        <li><a href="#training">5가지 훈련 소개</a></li>
+        <li><a href="#howto">사용 방법</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>정보</h4>
+      <ul>
+        <li><a href="#blog">두뇌 건강 정보</a></li>
+        <li><a href="#faq">자주 묻는 질문</a></li>
+        <li><a href="#board">커뮤니티</a></li>
+        <li><a href="/kor/privacy.html">개인정보처리방침</a></li>
+        <li><a href="#" onclick="toggleAdminLogin();return false;" id="admin-toggle-btn">관리자</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <div class="footer-copy">© 2025 JS 두뇌훈련 · All rights reserved</div>
+    <div class="footer-disclaimer">본 서비스는 의료 진단이나 치료를 목적으로 하지 않습니다. 인지 기능 개선에 관한 의학적 조언은 전문 의료인과 상담하세요.</div>
+  </div>
 </footer>
 
+<script>
+document.querySelectorAll('.faq-q').forEach(q => {
+  q.addEventListener('click', () => {
+    const item = q.parentElement;
+    const isOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if(!isOpen) item.classList.add('open');
+  });
+});
+
+if('IntersectionObserver' in window){
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+  }, {threshold:0.1});
+  document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+} else {
+  document.querySelectorAll('.fade-up').forEach(el => el.classList.add('visible'));
+}
+
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    const target = document.querySelector(a.getAttribute('href'));
+    if(!target) return;
+    e.preventDefault();
+    target.scrollIntoView({behavior:'smooth',block:'start'});
+  });
+});
+
+async function submitPost() {
+  const name = document.getElementById("post-name").value;
+  const content = document.getElementById("post-content").value;
+  const msg = document.getElementById("board-msg");
+  const btn = document.getElementById("btn-post-submit");
+  if(!name.trim()||!content.trim()){
+    msg.textContent="이름과 내용을 입력해주세요."; msg.className="board-msg err"; return;
+  }
+  btn.disabled=true; btn.textContent="...";
+  const ok = await window._submitPost(name, content);
+  if(ok){
+    msg.textContent="등록되었습니다!"; msg.className="board-msg ok";
+    document.getElementById("post-content").value="";
+    if(window._loadPosts) window._loadPosts();
+  } else {
+    msg.textContent="등록에 실패했습니다. 다시 시도해주세요."; msg.className="board-msg err";
+  }
+  btn.disabled=false; btn.textContent="등록하기";
+  setTimeout(()=>{ msg.textContent=""; },4000);
+}
+function loadMorePosts(){ if(window._loadMorePosts) window._loadMorePosts(); }
+window.loadMorePosts=loadMorePosts;
+
+function _va(i){try{return btoa(i||'')==='MDE1Mw==';}catch(e){return false;}}
+function toggleAdminLogin(){
+  if(window._isAdmin){
+    window._isAdmin=false;
+    document.getElementById("notice-write-area").style.display="none";
+    document.getElementById("admin-toggle-btn").textContent="관리자";
+    if(window._loadPosts) window._loadPosts(); return;
+  }
+  const pw=prompt("관리자 비밀번호를 입력하세요:");
+  if(_va(pw)){
+    window._isAdmin=true;
+    document.getElementById("notice-write-area").style.display="block";
+    document.getElementById("admin-toggle-btn").textContent="로그아웃";
+    if(window._loadPosts) window._loadPosts();
+  } else if(pw!==null){ alert("비밀번호가 틀렸습니다."); }
+}
+window.toggleAdminLogin=toggleAdminLogin;
+function toggleReplyForm(id){ const f=document.getElementById("reply-"+id); if(f) f.classList.toggle("open"); }
+window.toggleReplyForm=toggleReplyForm;
+function toggleEditForm(id){ const f=document.getElementById("edit-"+id); if(f) f.classList.toggle("open"); }
+window.toggleEditForm=toggleEditForm;
+async function submitReply(id){ const t=document.getElementById("reply-text-"+id)?.value||""; if(!t.trim()) return; const ok=await window._submitReply(id,t); if(ok){ if(window._loadPosts) window._loadPosts(); } else alert("답변 등록에 실패했습니다."); }
+window.submitReply=submitReply;
+async function submitEdit(id){ if(!window._isAdmin) return; const t=document.getElementById("edit-text-"+id)?.value||""; if(!t.trim()){ alert("내용을 입력하세요."); return; } const ok=await window._editPost(id,t); if(ok){ if(window._loadPosts) window._loadPosts(); } else alert("수정에 실패했습니다."); }
+window.submitEdit=submitEdit;
+async function deletePost(id){ if(!window._isAdmin) return; if(!confirm("삭제하시겠습니까?")) return; const ok=await window._deletePost(id); if(ok){ if(window._loadPosts) window._loadPosts(); } else alert("삭제에 실패했습니다."); }
+window.deletePost=deletePost;
+async function deleteNotice(id){ if(!window._isAdmin) return; if(!confirm("공지를 삭제하시겠습니까?")) return; const ok=await window._deleteNotice(id); if(ok){ if(window._loadPosts) window._loadPosts(); } else alert("삭제에 실패했습니다."); }
+window.deleteNotice=deleteNotice;
+async function submitNotice(){ const t=document.getElementById("notice-title")?.value||""; const c=document.getElementById("notice-content")?.value||""; if(!t.trim()||!c.trim()){ alert("제목과 내용을 입력하세요."); return; } const ok=await window._submitNotice(t,c); if(ok){ document.getElementById("notice-title").value=""; document.getElementById("notice-content").value=""; if(window._loadPosts) window._loadPosts(); alert("공지가 등록되었습니다."); } else alert("공지 등록에 실패했습니다."); }
+window.submitNotice=submitNotice;
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){
+    navigator.serviceWorker.register('/kor/sw.js')
+      .then(()=>console.log('SW registered'))
+      .catch(e=>console.log('SW error:',e));
+  });
+}
+</script>
 </body>
 </html>
